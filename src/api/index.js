@@ -32,6 +32,9 @@ api.interceptors.response.use(
 export const authApi = {
   register: (userData) => api.post('/login/save', userData),
   login: (credentials) => api.post('/login/auth', credentials),
+  forgotPassword: (email) => api.post('/api/auth/forgot-password', { email }),
+  resetPassword: (token, newPassword) => api.post('/api/auth/reset-password', { token, newPassword }),
+  validateResetToken: (token) => api.get(`/api/auth/validate-reset-token?token=${token}`),
 };
 
 export const omdbApi = {
@@ -70,12 +73,9 @@ export const omdbApiId = {
 };
 
 export const interactionApi = {
-  // Favorites - Backend string body bekliyor olabilir, boş body gönderelim
   addFavorite: (imdbId) => api.post(`/api/home/favorite/${imdbId}`, ""),
   removeFavorite: (imdbId) => api.delete(`/api/home/favorite/${imdbId}`),
   getFavorites: () => api.get('/api/home/favorite'),
-  
-  // Comments - Backend string content bekliyor
   addComment: (imdbId, content) => api.post(`/api/home/comment/${imdbId}`, content, {
     headers: {
       'Content-Type': 'text/plain'
@@ -84,8 +84,6 @@ export const interactionApi = {
   getComments: (imdbId) => api.get(`/api/home/comment/${imdbId}`),
   getUserComments: () => api.get('/api/home/comment/user'),
   deleteComment: (commentId) => api.delete(`/api/home/comment/${commentId}`),
-  
-  // Ratings - Backend Integer score bekliyor
   addRating: (imdbId, score) => api.post(`/api/home/rate/${imdbId}`, score, {
     headers: {
       'Content-Type': 'application/json'

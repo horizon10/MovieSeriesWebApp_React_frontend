@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
-import { interactionApi, omdbApiId } from '../api';
+import { interactionApi, omdbApiId, userApi } from '../api';
 import { 
   Typography, 
   Box, 
@@ -17,7 +17,19 @@ import {
   Container,
   Paper,
   IconButton,
-  Tooltip
+  Tooltip,
+  TextField,
+  Button,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  Divider,
+  InputAdornment,
+  Alert,
+  Collapse,
+  Switch,
+  FormControlLabel
 } from '@mui/material';
 import { 
   Favorite, 
@@ -26,20 +38,116 @@ import {
   Movie,
   Person,
   CalendarToday,
-  Delete
+  Delete,
+  Edit,
+  CameraAlt,
+  Visibility,
+  VisibilityOff,
+  Save,
+  Cancel,
+  Lock,
+  Email,
+  AccountCircle,
+  Security
 } from '@mui/icons-material';
 import { Link } from 'react-router-dom';
+import imageCompression from 'browser-image-compression';
 
 const UserProfilePage = () => {
-  const { user } = useAuth();
+  const { user, updateUser } = useAuth();
   const [activeTab, setActiveTab] = useState(0);
   const [favorites, setFavorites] = useState([]);
   const [comments, setComments] = useState([]);
   const [ratings, setRatings] = useState([]);
   const [loading, setLoading] = useState(false);
   const [movieDetails, setMovieDetails] = useState({});
+  
+  const [editMode, setEditMode] = useState(false);
+  const [editData, setEditData] = useState({
+    username: '',
+    email: '',
+    image: '',
+    currentPassword: '',
+    newPassword: '',
+    confirmPassword: ''
+  });
+  const [imagePreview, setImagePreview] = useState('');
+  const [openImageDialog, setOpenImageDialog] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(0);
+  const [showPasswords, setShowPasswords] = useState({
+    current: false,
+    new: false,
+    confirm: false
+  });
+  const [changePassword, setChangePassword] = useState(false);
+  const [alerts, setAlerts] = useState({
+    show: false,
+    type: 'info',
+    message: ''
+  });
+  const [passwordStrength, setPasswordStrength] = useState(0);
 
-  // Film detaylarını getir
+  // Password strength calculator
+  const calculatePasswordStrength = (password) => {
+    let strength = 0;
+    if (password.length >= 8) strength += 25;
+    if (password.match(/[a-z]/) && password.match(/[A-Z]/)) strength += 25;
+    if (password.match(/\d/)) strength += 25;
+    if (password.match(/[^a-zA-Z\d]/)) strength += 25;
+    return strength;
+  };
+
+  // Base64 conversion function
+  const convertToBase64 = (file) => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.readAsDataURL(file);
+      reader.onload = () => resolve(reader.result);
+      reader.onerror = error => reject(error);
+    });
+  };
+
+  // Handle image upload
+  const handleImageChange = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    if (file.size > 5 * 1024 * 1024) {
+      showAlert('error', 'Please select an image smaller than 5MB');
+      return;
+    }
+
+    const options = {
+      maxSizeMB: 0.5,
+      maxWidthOrHeight: 800,
+      useWebWorker: true,
+      onProgress: (progress) => {
+        setUploadProgress(progress);
+      }
+    };
+
+    try {
+      const compressedFile = await imageCompression(file, options);
+      setUploadProgress(30);
+      const base64Image = await convertToBase64(compressedFile);
+      setUploadProgress(80);
+      
+      setImagePreview(base64Image);
+      setEditData(prev => ({
+        ...prev,
+        image: base64Image
+      }));
+      setUploadProgress(100);
+      
+      setTimeout(() => setUploadProgress(0), 1000);
+    } catch (error) {
+      console.error("Image compression error:", error);
+      showAlert('error', 'Error occurred while uploading image');
+      setUploadProgress(0);
+    }
+  };
+
+  // Fetch movie details
   const fetchMovieDetails = async (imdbId) => {
     if (movieDetails[imdbId]) return movieDetails[imdbId];
     
@@ -54,7 +162,7 @@ const UserProfilePage = () => {
     }
   };
 
-  // Favori filmleri getir
+  // Fetch favorites
   const fetchFavorites = async () => {
     try {
       const response = await interactionApi.getFavorites();
@@ -76,11 +184,9 @@ const UserProfilePage = () => {
     }
   };
 
-  // Kullanıcı yorumlarını getir (tüm yorumlar)
+  // Fetch comments
   const fetchUserComments = async () => {
     try {
-      // Bu endpoint'in backend'de implemente edilmesi gerekiyor
-      // Örnek: /api/home/comments/user
       const response = await interactionApi.getUserComments();
       const commentsData = response.data;
 
@@ -100,11 +206,9 @@ const UserProfilePage = () => {
     }
   };
 
-  // Kullanıcı puanlarını getir (tüm puanlar)
+  // Fetch ratings
   const fetchUserRatings = async () => {
     try {
-      // Bu endpoint'in backend'de implemente edilmesi gerekiyor
-      // Örnek: /api/home/ratings/user
       const response = await interactionApi.getUserRatings();
       const ratingsData = response.data;
 
@@ -128,7 +232,6 @@ const UserProfilePage = () => {
     const loadData = async () => {
       setLoading(true);
       try {
-        // Tüm verileri paralel olarak yükle
         await Promise.all([
           fetchFavorites(),
           fetchUserComments(),
@@ -141,8 +244,30 @@ const UserProfilePage = () => {
     
     if (user) {
       loadData();
+      setEditData({
+        username: user.username,
+        email: user.email,
+        image: user.image,
+        currentPassword: '',
+        newPassword: '',
+        confirmPassword: ''
+      });
+      setImagePreview(user.image);
     }
   }, [user]);
+
+  useEffect(() => {
+    if (editData.newPassword) {
+      setPasswordStrength(calculatePasswordStrength(editData.newPassword));
+    } else {
+      setPasswordStrength(0);
+    }
+  }, [editData.newPassword]);
+
+  const showAlert = (type, message) => {
+    setAlerts({ show: true, type, message });
+    setTimeout(() => setAlerts({ show: false, type: 'info', message: '' }), 5000);
+  };
 
   const handleTabChange = (event, newValue) => {
     setActiveTab(newValue);
@@ -152,29 +277,193 @@ const UserProfilePage = () => {
     try {
       await interactionApi.removeFavorite(imdbId);
       setFavorites(favorites.filter(fav => fav.imdbId !== imdbId));
+      showAlert('success', 'Removed from favorites successfully');
     } catch (error) {
       console.error('Error removing favorite:', error);
+      showAlert('error', 'Failed to remove favorite');
     }
   };
 
   const deleteComment = async (commentId) => {
     try {
-      // Backend'de comment silme endpointi
       await interactionApi.deleteComment(commentId);
       setComments(comments.filter(comment => comment.id !== commentId));
+      showAlert('success', 'Comment deleted successfully');
     } catch (error) {
       console.error('Error deleting comment:', error);
+      showAlert('error', 'Failed to delete comment');
     }
   };
 
   const deleteRating = async (ratingId) => {
     try {
-      // Backend'de rating silme endpointi
       await interactionApi.deleteRating(ratingId);
       setRatings(ratings.filter(rating => rating.id !== ratingId));
+      showAlert('success', 'Rating deleted successfully');
     } catch (error) {
       console.error('Error deleting rating:', error);
+      showAlert('error', 'Failed to delete rating');
     }
+  };
+
+  const handleEditClick = () => {
+    setEditMode(true);
+  };
+
+  const handleCancelEdit = () => {
+    setEditMode(false);
+    setChangePassword(false);
+    setEditData({
+      username: user.username,
+      email: user.email,
+      image: user.image,
+      currentPassword: '',
+      newPassword: '',
+      confirmPassword: ''
+    });
+    setImagePreview(user.image);
+    setAlerts({ show: false, type: 'info', message: '' });
+  };
+
+  const handleInputChange = (e) => {
+    const { name, value } = e.target;
+    setEditData(prev => ({
+      ...prev,
+      [name]: value
+    }));
+  };
+
+  const togglePasswordVisibility = (field) => {
+    setShowPasswords(prev => ({
+      ...prev,
+      [field]: !prev[field]
+    }));
+  };
+
+  const validateForm = () => {
+  // Clear any previous alerts
+  setAlerts({ show: false, type: 'info', message: '' });
+
+  // Basic field validation
+  if (!editData.username.trim()) {
+    showAlert('error', 'Username is required');
+    return false;
+  }
+  
+  if (!editData.email.trim()) {
+    showAlert('error', 'Email is required');
+    return false;
+  }
+
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  if (!emailRegex.test(editData.email)) {
+    showAlert('error', 'Please enter a valid email address');
+    return false;
+  }
+
+  // Only validate password fields if changePassword is true
+  if (changePassword) {
+    if (!editData.currentPassword) {
+      showAlert('error', 'Current password is required');
+      return false;
+    }
+    
+    if (!editData.newPassword) {
+      showAlert('error', 'New password is required');
+      return false;
+    }
+    
+    if (editData.newPassword.length < 8) {
+      showAlert('error', 'New password must be at least 8 characters long');
+      return false;
+    }
+    
+    if (editData.newPassword !== editData.confirmPassword) {
+      showAlert('error', 'New passwords do not match');
+      return false;
+    }
+  }
+
+  return true;
+};
+
+  const handleSaveProfile = async () => {
+  if (!validateForm()) return;
+
+  try {
+    // Username check if changed
+    if (editData.username !== user.username) {
+      const usernameCheck = await userApi.checkUsername(editData.username);
+      if (usernameCheck.data) {
+        showAlert('error', 'This username is already taken');
+        return;
+      }
+    }
+
+    // Create payload with basic info
+    const payload = {
+      username: editData.username.trim(),
+      email: editData.email.trim(),
+      image: editData.image
+    };
+
+    // Only include password fields if changePassword is true
+    if (changePassword) {
+      payload.password = editData.newPassword.trim();
+      // Remove confirmPassword as it shouldn't be sent to the backend
+    }
+
+    // Debugging: log the payload before sending
+    console.log('Sending payload:', payload);
+
+    const response = await userApi.updateUser(user.id, payload);
+    updateUser(response.data);
+    
+    setEditMode(false);
+    setChangePassword(false);
+    showAlert('success', 'Profile updated successfully!');
+    
+    // Reset password fields after successful update
+    setEditData(prev => ({
+      ...prev,
+      currentPassword: '',
+      newPassword: '',
+      confirmPassword: ''
+    }));
+  } catch (error) {
+    console.error('Error updating profile:', error);
+    
+    if (error.response?.data?.error) {
+      showAlert('error', error.response.data.error);
+    } else if (error.response?.status === 400) {
+      showAlert('error', 'Error updating profile. Please check your information.');
+    } else {
+      showAlert('error', 'An error occurred while updating profile. Please try again.');
+    }
+  }
+};
+  
+
+  const handleOpenImageDialog = () => {
+    setOpenImageDialog(true);
+  };
+
+  const handleCloseImageDialog = () => {
+    setOpenImageDialog(false);
+  };
+
+  const getPasswordStrengthColor = (strength) => {
+    if (strength < 25) return '#f44336';
+    if (strength < 50) return '#ff9800';
+    if (strength < 75) return '#ffeb3b';
+    return '#4caf50';
+  };
+
+  const getPasswordStrengthText = (strength) => {
+    if (strength < 25) return 'Weak';
+    if (strength < 50) return 'Fair';
+    if (strength < 75) return 'Good';
+    return 'Strong';
   };
 
   const MovieCard = ({ item, type, onRemove }) => {
@@ -235,29 +524,47 @@ const UserProfilePage = () => {
             </Box>
           )}
           
-          {type === 'comment' && (
-            <Box sx={{ mt: 2 }}>
-              <Paper sx={{ p: 1, bgcolor: 'grey.50' }}>
-                <Typography variant="body2" sx={{ fontStyle: 'italic' }}>
-                  "{item.content}"
-                </Typography>
-              </Paper>
-              <Typography variant="caption" color="text.secondary">
-                Commented: {new Date(item.createdAt).toLocaleDateString()}
-              </Typography>
-              <Box sx={{ mt: 1, textAlign: 'right' }}>
-                <Tooltip title="Delete comment">
-                  <IconButton 
-                    size="small" 
-                    color="error"
-                    onClick={() => deleteComment(item.id)}
-                  >
-                    <Delete fontSize="small" />
-                  </IconButton>
-                </Tooltip>
-              </Box>
-            </Box>
-          )}
+         {type === 'comment' && (
+  <Box sx={{ mt: 2 }}>
+    <Paper 
+      sx={{ 
+        p: 2, 
+        bgcolor: 'black',
+        borderLeft: '4px solid',
+        borderColor: 'primary.main',
+        borderRadius: '4px'
+      }}
+    >
+      <Typography 
+        variant="body1" 
+        sx={{ 
+          whiteSpace: 'pre-wrap', // Bu satır boşlukların ve satır sonlarının korunmasını sağlar
+          wordBreak: 'break-word' // Uzun kelimeleri satır sonlarında böler
+        }}
+      >
+        {item.content}
+      </Typography>
+    </Paper>
+    <Typography 
+      variant="caption" 
+      color="text.secondary"
+      sx={{ display: 'block', mt: 1 }}
+    >
+      Commented: {new Date(item.createdAt).toLocaleDateString()}
+    </Typography>
+    <Box sx={{ mt: 1, textAlign: 'right' }}>
+      <Tooltip title="Delete comment">
+        <IconButton 
+          size="small" 
+          color="error"
+          onClick={() => deleteComment(item.id)}
+        >
+          <Delete fontSize="small" />
+        </IconButton>
+      </Tooltip>
+    </Box>
+  </Box>
+)}
           
           <Box sx={{ mt: 2 }}>
             <Link to={`/movie/${movie.imdbID}`} style={{ textDecoration: 'none' }}>
@@ -301,43 +608,428 @@ const UserProfilePage = () => {
 
   return (
     <Container maxWidth="lg" sx={{ py: 3 }}>
-      {/* Profil Başlığı */}
+      {/* Alert Messages */}
+      <Collapse in={alerts.show}>
+        <Alert 
+          severity={alerts.type} 
+          sx={{ mb: 2 }}
+          onClose={() => setAlerts({ show: false, type: 'info', message: '' })}
+        >
+          {alerts.message}
+        </Alert>
+      </Collapse>
+
+      {/* Profile Header */}
       <Card sx={{ mb: 4, background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)' }}>
         <CardContent sx={{ color: 'white', py: 4 }}>
-          <Box sx={{ display: 'flex', alignItems: 'center' }}>
-            <Avatar 
-              sx={{ 
-                width: 80, 
-                height: 80, 
-                mr: 3,
-                bgcolor: 'rgba(255,255,255,0.2)',
-                fontSize: '2rem'
-              }}
-            >
-              {user?.username?.charAt(0).toUpperCase()}
-            </Avatar>
-            <Box>
-              <Typography variant="h4" sx={{ fontWeight: 'bold', mb: 1 }}>
-                {user?.username}
-              </Typography>
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                  <Person fontSize="small" />
-                  <Typography variant="body1">Movie Enthusiast</Typography>
-                </Box>
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                  <CalendarToday fontSize="small" />
-                  <Typography variant="body1">
-                    Member since {new Date(user?.createdAt || Date.now()).toLocaleDateString()}
-                  </Typography>
-                </Box>
+          <Box sx={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', flexWrap: 'wrap', gap: 2 }}>
+            <Box sx={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 3 }}>
+              <Box sx={{ position: 'relative' }}>
+                <Avatar 
+                  sx={{ 
+                    width: 100, 
+                    height: 100, 
+                    bgcolor: 'rgba(255,255,255,0.2)',
+                    fontSize: '2.5rem',
+                    cursor: editMode ? 'pointer' : 'default'
+                  }}
+                  src={editMode ? imagePreview : user?.image}
+                  onClick={editMode ? handleOpenImageDialog : undefined}
+                >
+                  {!user?.image && user?.username?.charAt(0).toUpperCase()}
+                </Avatar>
+                {editMode && (
+                  <>
+                    <IconButton
+                      component="label"
+                      sx={{
+                        position: 'absolute',
+                        bottom: -5,
+                        right: -5,
+                        backgroundColor: 'rgba(0,0,0,0.7)',
+                        color: 'white',
+                        width: 35,
+                        height: 35,
+                        '&:hover': {
+                          backgroundColor: 'rgba(0,0,0,0.9)'
+                        }
+                      }}
+                    >
+                      <CameraAlt fontSize="small" />
+                      <input
+                        type="file"
+                        hidden
+                        accept="image/*"
+                        onChange={handleImageChange}
+                      />
+                    </IconButton>
+                    {uploadProgress > 0 && uploadProgress < 100 && (
+                      <CircularProgress 
+                        variant="determinate" 
+                        value={uploadProgress}
+                        size={80}
+                        sx={{
+                          position: 'absolute',
+                          top: 10,
+                          left: 10,
+                          color: 'white'
+                        }}
+                      />
+                    )}
+                  </>
+                )}
+              </Box>
+              
+              <Box sx={{ flex: 1, minWidth: 250 }}>
+                {editMode ? (
+                  <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                    <TextField
+                      name="username"
+                      value={editData.username}
+                      onChange={handleInputChange}
+                      variant="outlined"
+                      size="small"
+                      placeholder="Username"
+                      InputProps={{
+                        startAdornment: (
+                          <InputAdornment position="start">
+                            <AccountCircle sx={{ color: 'rgba(255,255,255,0.7)' }} />
+                          </InputAdornment>
+                        ),
+                      }}
+                      sx={{ 
+                        backgroundColor: 'rgba(255,255,255,0.1)',
+                        borderRadius: 1,
+                        '& .MuiOutlinedInput-root': {
+                          '& fieldset': {
+                            borderColor: 'rgba(255,255,255,0.3)',
+                          },
+                          '&:hover fieldset': {
+                            borderColor: 'rgba(255,255,255,0.5)',
+                          },
+                          '&.Mui-focused fieldset': {
+                            borderColor: 'rgba(255,255,255,0.8)',
+                          },
+                        },
+                        '& .MuiInputBase-input': {
+                          color: 'white',
+                        },
+                        '& .MuiInputBase-input::placeholder': {
+                          color: 'rgba(255,255,255,0.7)',
+                          opacity: 1,
+                        },
+                      }}
+                    />
+                    <TextField
+                      name="email"
+                      value={editData.email}
+                      onChange={handleInputChange}
+                      variant="outlined"
+                      size="small"
+                      placeholder="Email"
+                      InputProps={{
+                        startAdornment: (
+                          <InputAdornment position="start">
+                            <Email sx={{ color: 'rgba(255,255,255,0.7)' }} />
+                          </InputAdornment>
+                        ),
+                      }}
+                      sx={{ 
+                        backgroundColor: 'rgba(255,255,255,0.1)',
+                        borderRadius: 1,
+                        '& .MuiOutlinedInput-root': {
+                          '& fieldset': {
+                            borderColor: 'rgba(255,255,255,0.3)',
+                          },
+                          '&:hover fieldset': {
+                            borderColor: 'rgba(255,255,255,0.5)',
+                          },
+                          '&.Mui-focused fieldset': {
+                            borderColor: 'rgba(255,255,255,0.8)',
+                          },
+                        },
+                        '& .MuiInputBase-input': {
+                          color: 'white',
+                        },
+                        '& .MuiInputBase-input::placeholder': {
+                          color: 'rgba(255,255,255,0.7)',
+                          opacity: 1,
+                        },
+                      }}
+                    />
+                    
+                    <FormControlLabel
+                      control={
+                        <Switch 
+                          checked={changePassword} 
+                          onChange={(e) => setChangePassword(e.target.checked)}
+                          sx={{
+                            '& .MuiSwitch-switchBase.Mui-checked': {
+                              color: 'white',
+                            },
+                            '& .MuiSwitch-switchBase.Mui-checked + .MuiSwitch-track': {
+                              backgroundColor: 'rgba(255,255,255,0.5)',
+                            },
+                          }}
+                        />
+                      }
+                      label={
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                          <Security fontSize="small" />
+                          <Typography variant="body2">Change Password</Typography>
+                        </Box>
+                      }
+                      sx={{ color: 'white' }}
+                    />
+
+                    <Collapse in={changePassword}>
+                      <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, mt: 1 }}>
+                        <TextField
+                          name="currentPassword"
+                          type={showPasswords.current ? 'text' : 'password'}
+                          value={editData.currentPassword}
+                          onChange={handleInputChange}
+                          variant="outlined"
+                          size="small"
+                          placeholder="Current Password"
+                          InputProps={{
+                            startAdornment: (
+                              <InputAdornment position="start">
+                                <Lock sx={{ color: 'rgba(255,255,255,0.7)' }} />
+                              </InputAdornment>
+                            ),
+                            endAdornment: (
+                              <InputAdornment position="end">
+                                <IconButton
+                                  onClick={() => togglePasswordVisibility('current')}
+                                  sx={{ color: 'rgba(255,255,255,0.7)' }}
+                                >
+                                  {showPasswords.current ? <VisibilityOff /> : <Visibility />}
+                                </IconButton>
+                              </InputAdornment>
+                            ),
+                          }}
+                          sx={{ 
+                            backgroundColor: 'rgba(255,255,255,0.1)',
+                            borderRadius: 1,
+                            '& .MuiOutlinedInput-root': {
+                              '& fieldset': {
+                                borderColor: 'rgba(255,255,255,0.3)',
+                              },
+                              '&:hover fieldset': {
+                                borderColor: 'rgba(255,255,255,0.5)',
+                              },
+                              '&.Mui-focused fieldset': {
+                                borderColor: 'rgba(255,255,255,0.8)',
+                              },
+                            },
+                            '& .MuiInputBase-input': {
+                              color: 'white',
+                            },
+                            '& .MuiInputBase-input::placeholder': {
+                              color: 'rgba(255,255,255,0.7)',
+                              opacity: 1,
+                            },
+                          }}
+                        />
+                        
+                        <TextField
+                          name="newPassword"
+                          type={showPasswords.new ? 'text' : 'password'}
+                          value={editData.newPassword}
+                          onChange={handleInputChange}
+                          variant="outlined"
+                          size="small"
+                          placeholder="New Password"
+                          InputProps={{
+                            startAdornment: (
+                              <InputAdornment position="start">
+                                <Lock sx={{ color: 'rgba(255,255,255,0.7)' }} />
+                              </InputAdornment>
+                            ),
+                            endAdornment: (
+                              <InputAdornment position="end">
+                                <IconButton
+                                  onClick={() => togglePasswordVisibility('new')}
+                                  sx={{ color: 'rgba(255,255,255,0.7)' }}
+                                >
+                                  {showPasswords.new ? <VisibilityOff /> : <Visibility />}
+                                </IconButton>
+                              </InputAdornment>
+                            ),
+                          }}
+                          sx={{ 
+                            backgroundColor: 'rgba(255,255,255,0.1)',
+                            borderRadius: 1,
+                            '& .MuiOutlinedInput-root': {
+                              '& fieldset': {
+                                borderColor: 'rgba(255,255,255,0.3)',
+                              },
+                              '&:hover fieldset': {
+                                borderColor: 'rgba(255,255,255,0.5)',
+                              },
+                              '&.Mui-focused fieldset': {
+                                borderColor: 'rgba(255,255,255,0.8)',
+                              },
+                            },
+                            '& .MuiInputBase-input': {
+                              color: 'white',
+                            },
+                            '& .MuiInputBase-input::placeholder': {
+                              color: 'rgba(255,255,255,0.7)',
+                              opacity: 1,
+                            },
+                          }}
+                        />
+                        
+                        {editData.newPassword && (
+                          <Box sx={{ mt: 1 }}>
+                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
+                              <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.8)' }}>
+                                Password Strength:
+                              </Typography>
+                              <Typography 
+                                variant="caption" 
+                                sx={{ 
+                                  color: getPasswordStrengthColor(passwordStrength),
+                                  fontWeight: 'bold'
+                                }}
+                              >
+                                {getPasswordStrengthText(passwordStrength)}
+                              </Typography>
+                            </Box>
+                            <Box 
+                              sx={{ 
+                                width: '100%', 
+                                height: 4, 
+                                backgroundColor: 'rgba(255,255,255,0.2)', 
+                                borderRadius: 2 
+                              }}
+                            >
+                              <Box 
+                                sx={{ 
+                                  width: `${passwordStrength}%`, 
+                                  height: '100%', 
+                                  backgroundColor: getPasswordStrengthColor(passwordStrength),
+                                  borderRadius: 2,
+                                  transition: 'width 0.3s ease, background-color 0.3s ease'
+                                }}
+                              />
+                            </Box>
+                          </Box>
+                        )}
+                        
+                        <TextField
+                          name="confirmPassword"
+                          type={showPasswords.confirm ? 'text' : 'password'}
+                          value={editData.confirmPassword}
+                          onChange={handleInputChange}
+                          variant="outlined"
+                          size="small"
+                          placeholder="Confirm New Password"
+                          InputProps={{
+                            startAdornment: (
+                              <InputAdornment position="start">
+                                <Lock sx={{ color: 'rgba(255,255,255,0.7)' }} />
+                              </InputAdornment>
+                            ),
+                            endAdornment: (
+                              <InputAdornment position="end">
+                                <IconButton
+                                  onClick={() => togglePasswordVisibility('confirm')}
+                                  sx={{ color: 'rgba(255,255,255,0.7)' }}
+                                >
+                                  {showPasswords.confirm ? <VisibilityOff /> : <Visibility />}
+                                </IconButton>
+                              </InputAdornment>
+                            ),
+                          }}
+                          sx={{ 
+                            backgroundColor: 'rgba(255,255,255,0.1)',
+                            borderRadius: 1,
+                            '& .MuiOutlinedInput-root': {
+                              '& fieldset': {
+                                borderColor: 'rgba(255,255,255,0.3)',
+                              },
+                              '&:hover fieldset': {
+                                borderColor: 'rgba(255,255,255,0.5)',
+                              },
+                              '&.Mui-focused fieldset': {
+                                borderColor: 'rgba(255,255,255,0.8)',
+                              },
+                            },
+                            '& .MuiInputBase-input': {
+                              color: 'white',
+                            },
+                            '& .MuiInputBase-input::placeholder': {
+                              color: 'rgba(255,255,255,0.7)',
+                              opacity: 1,
+                            },
+                          }}
+                        />
+                      </Box>
+                    </Collapse>
+                  </Box>
+                ) : (
+                  <>
+                    <Typography variant="h4" sx={{ fontWeight: 'bold', mb: 1 }}>
+                      {user?.username}
+                    </Typography>
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                        <Person fontSize="small" />
+                        <Typography variant="body1">Movie Enthusiast</Typography>
+                      </Box>
+                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                        <CalendarToday fontSize="small" />
+                        <Typography variant="body1">
+                          Member since {new Date(user?.createdAt || Date.now()).toLocaleDateString()}
+                        </Typography>
+                      </Box>
+                    </Box>
+                  </>
+                )}
               </Box>
             </Box>
+            {!editMode ? (
+              <Tooltip title="Edit Profile">
+                <IconButton 
+                  onClick={handleEditClick}
+                  sx={{ 
+                    color: 'white',
+                    backgroundColor: 'rgba(255,255,255,0.2)',
+                    '&:hover': {
+                      backgroundColor: 'rgba(255,255,255,0.3)'
+                    }
+                  }}
+                >
+                  <Edit />
+                </IconButton>
+              </Tooltip>
+            ) : (
+              <Box sx={{ display: 'flex', gap: 1 }}>
+                <Button 
+                  variant="contained" 
+                  color="primary"
+                  onClick={handleSaveProfile}
+                  disabled={uploadProgress > 0 && uploadProgress < 100}
+                >
+                  {uploadProgress > 0 && uploadProgress < 100 ? 'Uploading...' : 'Save'}
+                </Button>
+                <Button 
+                  variant="outlined" 
+                  sx={{ color: 'white', borderColor: 'white' }}
+                  onClick={handleCancelEdit}
+                >
+                  Cancel
+                </Button>
+              </Box>
+            )}
           </Box>
         </CardContent>
       </Card>
 
-      {/* İstatistikler */}
+      {/* Statistics */}
       <Grid container spacing={3} sx={{ mb: 4 }}>
         <Grid item xs={12} sm={4}>
           <StatCard 
@@ -391,7 +1083,7 @@ const UserProfilePage = () => {
         </Tabs>
       </Paper>
 
-      {/* Tab İçerikleri */}
+      {/* Tab Contents */}
       {activeTab === 0 && (
         <Box>
           {favorites.length === 0 ? (
@@ -467,6 +1159,22 @@ const UserProfilePage = () => {
           )}
         </Box>
       )}
+
+      {/* Image Preview Dialog */}
+      <Dialog open={openImageDialog} onClose={handleCloseImageDialog}>
+        <DialogTitle>Profile Picture</DialogTitle>
+        <DialogContent>
+          <Box sx={{ display: 'flex', justifyContent: 'center' }}>
+            <Avatar 
+              src={imagePreview || user?.image} 
+              sx={{ width: 200, height: 200 }}
+            />
+          </Box>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={handleCloseImageDialog}>Close</Button>
+        </DialogActions>
+      </Dialog>
     </Container>
   );
 };

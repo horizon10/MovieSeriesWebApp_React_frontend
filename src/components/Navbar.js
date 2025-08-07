@@ -9,18 +9,19 @@ const Navbar = () => {
   const handleLogout = () => {
     logout();
     navigate('/login');
+    window.location.reload();
   };
 
   return (
     <AppBar position="static">
       <Toolbar>
         <Typography variant="h6" component="div" sx={{ flexGrow: 1 }}>
-          Movie App
+          <Button color="inherit" component={Link} to="/">Movie App</Button>
         </Typography>
         <Box>
+          <Button color="inherit" component={Link} to="/">Home</Button>
           {user ? (
             <>
-              <Button color="inherit" component={Link} to="/">Home</Button>
               <Button color="inherit" component={Link} to="/profile">Profile</Button>
               {user.role === 'ADMIN' && (
                 <Button color="inherit" component={Link} to="/admin">Admin</Button>

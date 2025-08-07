@@ -11,6 +11,7 @@ import AdminPage from './pages/AdminPage';
 import PrivateRoute from './routes/PrivateRoute';
 import AdminRoute from './routes/AdminRoute';
 import Navbar from './components/Navbar';
+import ResetPasswordPage from './pages/ResetPasswordPage';
 
 const theme = createTheme({
   palette: {
@@ -32,10 +33,11 @@ function App() {
         <Router>
           <Navbar />
           <Routes>
+            <Route path="/change-password" element={<ResetPasswordPage />} />
             <Route path="/login" element={<LoginPage />} />
             <Route path="/register" element={<RegisterPage />} />
-            <Route path="/" element={<PrivateRoute><HomePage /></PrivateRoute>} />
-            <Route path="/movie/:imdbId" element={<PrivateRoute><MovieDetailPage /></PrivateRoute>} />
+            <Route path="/" element={<HomePage />} /> {/* Public route */}
+            <Route path="/movie/:imdbId" element={<MovieDetailPage />} /> {/* Public route */}
             <Route path="/profile" element={<PrivateRoute><UserProfilePage /></PrivateRoute>} />
             <Route path="/admin" element={<AdminRoute><AdminPage /></AdminRoute>} />
           </Routes>

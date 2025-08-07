@@ -17,16 +17,31 @@ export const AuthProvider = ({ children }) => {
   }, []);
 
   const login = async (credentials) => {
-    try {
-      const response = await authApi.login(credentials);
-      localStorage.setItem('token', response.data.token);
-      localStorage.setItem('username', credentials.username);
-      setUser({ username: credentials.username });
-      return response;
-    } catch (error) {
-      throw error;
-    }
-  };
+  try {
+    const response = await authApi.login(credentials);
+    const { token, id, username, email, image } = response.data;
+    
+    // Tüm kullanıcı bilgilerini kaydet
+    localStorage.setItem('token', token);
+    localStorage.setItem('userId', id);
+    localStorage.setItem('username', username);
+    localStorage.setItem('email', email || '');
+    localStorage.setItem('image', image || '');
+    
+    setUser({
+      id, // Artık ID mevcut
+      username,
+      email,
+      image
+    });
+    
+    return response;
+  } catch (error) {
+    throw error;
+  }
+};
+
+
 
   const register = async (userData) => {
     try {
@@ -42,12 +57,30 @@ export const AuthProvider = ({ children }) => {
     localStorage.removeItem('username');
     setUser(null);
   };
+  const updateUser = (updatedUser) => {
+  localStorage.setItem('username', updatedUser.username);
+  localStorage.setItem('email', updatedUser.email || '');
+  localStorage.setItem('image', updatedUser.image || '');
+  
+  setUser(prev => ({
+    ...prev,
+    ...updatedUser
+  }));
+};
 
   return (
-    <AuthContext.Provider value={{ user, login, register, logout, loading }}>
-      {children}
-    </AuthContext.Provider>
-  );
+  <AuthContext.Provider value={{ 
+    user, 
+    login, 
+    register, 
+    logout, 
+    updateUser, // Bu satırı ekledik
+    loading 
+  }}>
+    {children}
+  </AuthContext.Provider>
+);
 };
+
 
 export const useAuth = () => useContext(AuthContext);

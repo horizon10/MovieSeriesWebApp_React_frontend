@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useParams } from 'react-router-dom';
+
 import { omdbApiId, interactionApi } from '../api';
 import {
   Box, Typography, Card, CardContent, CardMedia,
@@ -9,6 +9,7 @@ import {
   Backdrop, CircularProgress
 } from '@mui/material';
 import FavoriteIcon from '@mui/icons-material/Favorite';
+import { useAuth } from '../context/AuthContext';
 import FavoriteBorderIcon from '@mui/icons-material/FavoriteBorder';
 import StarIcon from '@mui/icons-material/Star';
 import CommentIcon from '@mui/icons-material/Comment';
@@ -19,6 +20,7 @@ import AccessTimeIcon from '@mui/icons-material/AccessTime';
 import PublicIcon from '@mui/icons-material/Public';
 import MovieIcon from '@mui/icons-material/Movie';
 import PersonIcon from '@mui/icons-material/Person';
+import { useParams, useNavigate } from 'react-router-dom';
 
 const MovieDetailPage = () => {
   const { imdbId } = useParams();
@@ -31,6 +33,8 @@ const MovieDetailPage = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [successMessage, setSuccessMessage] = useState('');
+  const { user } = useAuth();
+  const navigate = useNavigate();
 
   useEffect(() => {
     const fetchData = async () => {
@@ -175,6 +179,14 @@ const MovieDetailPage = () => {
       </Container>
     );
   }
+  const getValidImageUrl = (url) => {
+  if (!url) return null;
+  if (url.startsWith('http') || url.startsWith('/')) {
+    return url;
+  }
+  return `${process.env.REACT_APP_API_BASE_URL}${url}`;
+};
+  
 
   return (
 
@@ -295,24 +307,24 @@ const MovieDetailPage = () => {
                       ({movie.Year})
                     </Typography>
                   </Box>
-                  <IconButton 
-                    onClick={toggleFavorite} 
-                    size="large"
-                    sx={{
-                      background: isFavorite ? 'rgba(244, 67, 54, 0.1)' : 'rgba(0,0,0,0.05)',
-                      '&:hover': {
-                        background: isFavorite ? 'rgba(244, 67, 54, 0.2)' : 'rgba(0,0,0,0.1)',
-                        transform: 'scale(1.1)'
-                      },
-                      transition: 'all 0.2s ease'
-                    }}
-                  >
-                    {isFavorite ? (
-                      <FavoriteIcon sx={{ color: '#f44336', fontSize: 32 }} />
-                    ) : (
-                      <FavoriteBorderIcon sx={{ fontSize: 32 }} />
-                    )}
-                  </IconButton>
+                    <IconButton 
+    onClick={user ? toggleFavorite : () => navigate('/login')} 
+    size="large"
+    sx={{
+      background: isFavorite ? 'rgba(244, 67, 54, 0.1)' : 'rgba(0,0,0,0.05)',
+      '&:hover': {
+        background: isFavorite ? 'rgba(244, 67, 54, 0.2)' : 'rgba(0,0,0,0.1)',
+        transform: 'scale(1.1)'
+      },
+      transition: 'all 0.2s ease'
+    }}
+  >
+    {isFavorite ? (
+      <FavoriteIcon sx={{ color: '#f44336', fontSize: 32 }} />
+    ) : (
+      <FavoriteBorderIcon sx={{ fontSize: 32 }} />
+    )}
+  </IconButton>
                 </Box>
 
                 {/* Film Etiketleri */}
@@ -362,12 +374,11 @@ const MovieDetailPage = () => {
                         Ortalama Puan
                       </Typography>
                       <Box display="flex" alignItems="center" gap={1}>
-                        <Rating 
-                          value={averageRating} 
-                          precision={0.1} 
-                          readOnly 
-                          size="large"
-                        />
+                        <Rating
+  value={userRating}
+  onChange={(e, val) => user ? setUserRating(val || 0) : navigate('/login')}
+  size="large"
+/>
                         <Typography variant="h6" color="primary">
                           ({averageRating.toFixed(1)})
                         </Typography>
@@ -477,36 +488,48 @@ const MovieDetailPage = () => {
             </Typography>
 
             {/* Yorum Ekleme */}
-            <Paper sx={{ p: 3, mb: 3, background: 'rgba(25, 118, 210, 0.05)' }} elevation={2}>
-              <TextField
-                fullWidth
-                variant="outlined"
-                label="Yorumunuzu yazın..."
-                value={newComment}
-                onChange={(e) => setNewComment(e.target.value)}
-                multiline
-                rows={3}
-                sx={{ mb: 2 }}
-                onKeyPress={(e) => {
-                  if (e.key === 'Enter' && e.ctrlKey) {
-                    handleAddComment();
-                  }
-                }}
-              />
-              <Box display="flex" justifyContent="space-between" alignItems="center">
-                <Typography variant="caption" color="text.secondary">
-                  Ctrl + Enter ile gönder
-                </Typography>
-                <Button 
-                  variant="contained" 
-                  onClick={handleAddComment}
-                  disabled={!newComment.trim()}
-                  sx={{ borderRadius: 2, px: 3 }}
-                >
-                  Yorum Yap
-                </Button>
-              </Box>
-            </Paper>
+            {user ? (
+  <Paper sx={{ p: 3, mb: 3, background: 'rgba(25, 118, 210, 0.05)' }} elevation={2}>
+    <TextField
+      fullWidth
+      variant="outlined"
+      label="Yorumunuzu yazın..."
+      value={newComment}
+      onChange={(e) => setNewComment(e.target.value)}
+      multiline
+      rows={3}
+      sx={{ mb: 2 }}
+      onKeyPress={(e) => {
+        if (e.key === 'Enter' && e.ctrlKey) {
+          handleAddComment();
+        }
+      }}
+    />
+    <Box display="flex" justifyContent="space-between" alignItems="center">
+      <Typography variant="caption" color="text.secondary">
+        Ctrl + Enter ile gönder
+      </Typography>
+      <Button 
+        variant="contained" 
+        onClick={handleAddComment}
+        disabled={!newComment.trim()}
+        sx={{ borderRadius: 2, px: 3 }}
+      >
+        Yorum Yap
+      </Button>
+    </Box>
+  </Paper>
+) : (
+  <Paper sx={{ p: 3, mb: 3, textAlign: 'center' }}>
+    <Button 
+      variant="outlined" 
+      onClick={() => navigate('/login')}
+      startIcon={<CommentIcon />}
+    >
+      Yorum yapmak için giriş yapın
+    </Button>
+  </Paper>
+)}
 
             {/* Yorumlar Listesi */}
             {comments.length > 0 ? (
@@ -524,34 +547,43 @@ const MovieDetailPage = () => {
                         }
                       }}
                     >
-                      <Avatar sx={{ mr: 2, mt: 0.5, bgcolor: 'primary.main' }}>
-                        <PersonIcon />
-                      </Avatar>
+                      <Avatar 
+            sx={{ mr: 2, mt: 0.5, bgcolor: 'primary.main' }}
+            src={comment.userImage || undefined}
+          >
+            {!comment.userImage && <PersonIcon />}
+          </Avatar>
                       <ListItemText
-                        primary={
-                          <Typography variant="subtitle1" sx={{ fontWeight: 'bold', color: 'primary.main' }}>
-                            {comment.username || 'Anonim Kullanıcı'}
-                          </Typography>
-                        }
-                        secondary={
-                          <Box>
-                            <Typography
-                              variant="body1"
-                              sx={{ 
-                                mt: 1,
-                                mb: 1,
-                                color: 'text.primary',
-                                lineHeight: 1.6
-                              }}
-                            >
-                              {comment.content}
-                            </Typography>
-                            <Typography variant="caption" color="text.secondary">
-                              {comment.createdAt ? new Date(comment.createdAt).toLocaleString('tr-TR') : 'Şimdi'}
-                            </Typography>
-                          </Box>
-                        }
-                      />
+  primary={
+    <Typography variant="subtitle1" sx={{ fontWeight: 'bold', color: 'primary.main' }}>
+      {comment.username || 'Anonim Kullanıcı'}
+    </Typography>
+  }
+  secondary={
+    <>
+      <Typography
+        variant="body1"
+        component="div"
+        sx={{ 
+          mt: 1,
+          mb: 1,
+          color: 'text.primary',
+          lineHeight: 1.6
+        }}
+      >
+        {comment.content}
+      </Typography>
+      <Typography 
+        variant="caption" 
+        component="div" 
+        color="text.secondary"
+      >
+        {comment.createdAt ? new Date(comment.createdAt).toLocaleString('tr-TR') : 'Şimdi'}
+      </Typography>
+    </>
+  }
+  secondaryTypographyProps={{ component: "div" }}
+/>
                     </ListItem>
                     {index < comments.length - 1 && <Divider sx={{ my: 1 }} />}
                   </Box>
