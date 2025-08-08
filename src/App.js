@@ -33,6 +33,7 @@ function App() {
         <Router>
           <Navbar />
           <Routes>
+            <Route path="/reset-password" element={<ResetPasswordPage />} />
             <Route path="/change-password" element={<ResetPasswordPage />} />
             <Route path="/login" element={<LoginPage />} />
             <Route path="/register" element={<RegisterPage />} />

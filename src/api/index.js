@@ -32,10 +32,12 @@ api.interceptors.response.use(
 export const authApi = {
   register: (userData) => api.post('/login/save', userData),
   login: (credentials) => api.post('/login/auth', credentials),
-  forgotPassword: (email) => api.post('/api/auth/forgot-password', { email }),
-  resetPassword: (token, newPassword) => api.post('/api/auth/reset-password', { token, newPassword }),
-  validateResetToken: (token) => api.get(`/api/auth/validate-reset-token?token=${token}`),
+  forgotPassword: (email) => api.post('/login/forgot-password', { email }), // DÜZELTİLDİ
+  resetPassword: (token, newPassword) => 
+      api.post('/login/reset-password', null, { params: { token, newPassword } }), // DÜZELTİLDİ
+  validateResetToken: (token) => api.get(`/login/validate-reset-token?token=${token}`), // DÜZELTİLDİ
 };
+
 
 export const omdbApi = {
   // Arama listesi (kategori aramaları için)

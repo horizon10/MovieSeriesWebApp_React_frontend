@@ -51,27 +51,27 @@ const HomePage = () => {
 
   const popularMovieKeywords = [
     'Avengers', 'Spider-Man', 'Batman', 'Superman', 'Star Wars', 
-    'Harry Potter', 'Lord of the Rings', 'Fast Furious', 'Mission Impossible', 'Terminator'
+    'Harry_Potter', 'Lord_of_the_Rings', 'Fast_Furious', 'Mission_Impossible', 'Terminator'
   ];
   
   const popularSeriesKeywords = [
-    'Breaking Bad', 'Game of Thrones', 'Friends', 'The Office', 'Stranger Things',
-    'The Crown', 'Narcos', 'House of Cards', 'Sherlock', 'Lost'
+    'Breaking_Bad', 'Game_of_Thrones', 'Friends', 'The_Office', 'Stranger_Things',
+    'The_Crown', 'Narcos', 'House_of_Cards', 'Sherlock', 'Lost'
   ];
 
   const actionKeywords = [
-    'John Wick', 'Die Hard', 'Mad Max', 'Rambo', 'Rocky', 
-    'Gladiator', 'Matrix', 'Taken', 'Bourne', 'Top Gun'
+    'John_Wick', 'Die_Hard', 'Mad_Max', 'Rambo', 'Rocky', 
+    'Gladiator', 'Matrix', 'Taken', 'Bourne', 'Top_Gun'
   ];
 
   const horrorKeywords = [
-    'Halloween', 'Friday the 13th', 'Nightmare', 'Scream', 'It',
-    'Conjuring', 'Insidious', 'Paranormal Activity', 'Saw', 'Exorcist'
+    'Halloween', 'Friday_the_13th', 'Nightmare', 'Scream', 'It',
+    'Conjuring', 'Insidious', 'Paranormal_Activity', 'Saw', 'Exorcist'
   ];
 
   const comedyKeywords = [
-    'Hangover', 'Anchorman', 'Dumb and Dumber', 'Ghostbusters', 'Superbad',
-    'Step Brothers', 'Tropic Thunder', 'Zoolander', 'Wedding Crashers', 'Meet the Parents'
+    'Hangover', 'Anchorman', 'Dumb_and_Dumber', 'Ghostbusters', 'Superbad',
+    'Step_Brothers', 'Tropic_Thunder', 'Zoolander', 'Wedding_Crashers', 'Meet_the_Parents'
   ];
 
   const fetchCategoryMovies = async (keywords, setterFunction) => {

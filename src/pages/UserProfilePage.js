@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
+import { LiveTv } from '@mui/icons-material';
 import { interactionApi, omdbApiId, userApi } from '../api';
 import { 
   Typography, 
@@ -56,7 +57,11 @@ import imageCompression from 'browser-image-compression';
 const UserProfilePage = () => {
   const { user, updateUser } = useAuth();
   const [activeTab, setActiveTab] = useState(0);
-  const [favorites, setFavorites] = useState([]);
+const [favorites, setFavorites] = useState({
+  all: [],
+  movies: [],
+  series: []
+});
   const [comments, setComments] = useState([]);
   const [ratings, setRatings] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -148,41 +153,68 @@ const UserProfilePage = () => {
   };
 
   // Fetch movie details
-  const fetchMovieDetails = async (imdbId) => {
-    if (movieDetails[imdbId]) return movieDetails[imdbId];
+const fetchMovieDetails = async (imdbId) => {
+  if (movieDetails[imdbId]) return movieDetails[imdbId];
+  
+  try {
+    const response = await omdbApiId.search(imdbId);
+    const details = response.data;
     
-    try {
-      const response = await omdbApiId.search(imdbId);
-      const details = response.data;
-      setMovieDetails(prev => ({ ...prev, [imdbId]: details }));
-      return details;
-    } catch (error) {
-      console.error('Error fetching movie details:', error);
-      return null;
+    // Daha kesin tür kontrolü yapıyoruz
+    let standardizedType = 'movie'; // Varsayılan olarak film
+    if (details.Type) {
+      const lowerType = details.Type.toLowerCase();
+      if (lowerType.includes('series') || lowerType.includes('tv')) {
+        standardizedType = 'series';
+      }
     }
-  };
+    
+    const detailsWithStandardType = {
+      ...details,
+      Type: standardizedType
+    };
+    
+    setMovieDetails(prev => ({ ...prev, [imdbId]: detailsWithStandardType }));
+    return detailsWithStandardType;
+  } catch (error) {
+    console.error('Error fetching movie details:', error);
+    return null;
+  }
+};
 
   // Fetch favorites
-  const fetchFavorites = async () => {
-    try {
-      const response = await interactionApi.getFavorites();
-      const favoritesData = response.data;
-      
-      const favoritesWithDetails = await Promise.all(
-        favoritesData.map(async (fav) => {
-          const movieDetail = await fetchMovieDetails(fav.imdbId);
-          return {
-            ...fav,
-            movieDetail
-          };
-        })
-      );
-      
-      setFavorites(favoritesWithDetails);
-    } catch (error) {
-      console.error('Error fetching favorites:', error);
-    }
-  };
+const fetchFavorites = async () => {
+  try {
+    const response = await interactionApi.getFavorites();
+    const favoritesData = response.data;
+    
+    const favoritesWithDetails = await Promise.all(
+      favoritesData.map(async (fav) => {
+        const movieDetail = await fetchMovieDetails(fav.imdbId);
+        // Tür bilgisini standartlaştırılmış şekilde alıyoruz
+        const type = movieDetail?.Type || 'movie';
+        return {
+          ...fav,
+          movieDetail,
+          type
+        };
+      })
+    );
+    
+    // Favorileri türlerine göre kesin olarak ayırıyoruz
+    const movies = favoritesWithDetails.filter(item => item.type === 'movie');
+    const series = favoritesWithDetails.filter(item => item.type === 'series');
+    
+    setFavorites({
+      all: favoritesWithDetails,
+      movies,
+      series
+    });
+  } catch (error) {
+    console.error('Error fetching favorites:', error);
+  }
+};
+
 
   // Fetch comments
   const fetchUserComments = async () => {
@@ -276,7 +308,12 @@ const UserProfilePage = () => {
   const removeFavorite = async (imdbId) => {
     try {
       await interactionApi.removeFavorite(imdbId);
-      setFavorites(favorites.filter(fav => fav.imdbId !== imdbId));
+      setFavorites(prev => ({
+  all: prev.all.filter(fav => fav.imdbId !== imdbId),
+  movies: prev.movies.filter(fav => fav.imdbId !== imdbId),
+  series: prev.series.filter(fav => fav.imdbId !== imdbId)
+}));
+
       showAlert('success', 'Removed from favorites successfully');
     } catch (error) {
       console.error('Error removing favorite:', error);
@@ -1035,7 +1072,7 @@ const UserProfilePage = () => {
           <StatCard 
             icon={<Favorite sx={{ fontSize: 40 }} />}
             title="Favorites"
-            count={favorites.length}
+            count={favorites.all.length}
             color="#e91e63"
           />
         </Grid>
@@ -1060,105 +1097,171 @@ const UserProfilePage = () => {
       {/* Tabs */}
       <Paper sx={{ mb: 3 }}>
         <Tabs 
-          value={activeTab} 
-          onChange={handleTabChange}
-          variant="fullWidth"
-          sx={{ borderBottom: 1, borderColor: 'divider' }}
-        >
-          <Tab 
-            icon={<Favorite />} 
-            label={`Favorites (${favorites.length})`}
-            iconPosition="start"
-          />
-          <Tab 
-            icon={<Star />} 
-            label={`Ratings (${ratings.length})`}
-            iconPosition="start"
-          />
-          <Tab 
-            icon={<Comment />} 
-            label={`Comments (${comments.length})`}
-            iconPosition="start"
-          />
-        </Tabs>
+  value={activeTab} 
+  onChange={handleTabChange}
+  variant="fullWidth"
+  sx={{ borderBottom: 1, borderColor: 'divider' }}
+>
+  <Tab 
+    icon={<Favorite />} 
+    label={`All (${favorites.all.length})`}
+    iconPosition="start"
+  />
+  <Tab 
+    icon={<Movie />} 
+    label={`Movies (${favorites.movies.length})`}
+    iconPosition="start"
+  />
+  <Tab 
+    icon={<LiveTv />}
+    label={`Series (${favorites.series.length})`}
+    iconPosition="start"
+  />
+  <Tab 
+    icon={<Star />} 
+    label={`Ratings (${ratings.length})`}
+    iconPosition="start"
+  />
+  <Tab 
+    icon={<Comment />} 
+    label={`Comments (${comments.length})`}
+    iconPosition="start"
+  />
+</Tabs>
       </Paper>
-
-      {/* Tab Contents */}
       {activeTab === 0 && (
-        <Box>
-          {favorites.length === 0 ? (
-            <Paper sx={{ p: 4, textAlign: 'center' }}>
-              <Movie sx={{ fontSize: 60, color: 'grey.400', mb: 2 }} />
-              <Typography variant="h6" gutterBottom>
-                No favorites yet
-              </Typography>
-              <Typography variant="body2" color="text.secondary">
-                Start adding movies to your favorites to see them here!
-              </Typography>
-            </Paper>
-          ) : (
-            <Grid container spacing={3}>
-              {favorites.map((favorite) => (
-                <Grid item xs={12} sm={6} md={4} key={favorite.imdbId}>
-                  <MovieCard 
-                    item={favorite} 
-                    type="favorite"
-                    onRemove={removeFavorite}
-                  />
-                </Grid>
-              ))}
-            </Grid>
-          )}
-        </Box>
-      )}
+  <Box>
+    {/* Tab Contents */}
+    {favorites.all.length === 0 ? (
+      <Paper sx={{ p: 4, textAlign: 'center' }}>
+        <Favorite sx={{ fontSize: 60, color: 'grey.400', mb: 2 }} />
+        <Typography variant="h6" gutterBottom>
+          No favorites yet
+        </Typography>
+        <Typography variant="body2" color="text.secondary">
+          Start adding movies and series to your favorites to see them here!
+        </Typography>
+      </Paper>
+    ) : (
+      <Grid container spacing={3}>
+        {favorites.all.map((favorite) => (
+          <Grid item xs={12} sm={6} md={4} key={favorite.imdbId}>
+            <MovieCard 
+              item={favorite} 
+              type="favorite"
+              onRemove={removeFavorite}
+            />
+          </Grid>
+        ))}
+      </Grid>
+    )}
+  </Box>
+)}
 
-      {activeTab === 1 && (
-        <Box>
-          {ratings.length === 0 ? (
-            <Paper sx={{ p: 4, textAlign: 'center' }}>
-              <Star sx={{ fontSize: 60, color: 'grey.400', mb: 2 }} />
-              <Typography variant="h6" gutterBottom>
-                No ratings yet
-              </Typography>
-              <Typography variant="body2" color="text.secondary">
-                Rate some movies to see your ratings here!
-              </Typography>
-            </Paper>
-          ) : (
-            <Grid container spacing={3}>
-              {ratings.map((rating) => (
-                <Grid item xs={12} sm={6} md={4} key={`${rating.imdbId}-${rating.id}`}>
-                  <MovieCard item={rating} type="rating" />
-                </Grid>
-              ))}
-            </Grid>
-          )}
-        </Box>
-      )}
-
-      {activeTab === 2 && (
-        <Box>
-          {comments.length === 0 ? (
-            <Paper sx={{ p: 4, textAlign: 'center' }}>
-              <Comment sx={{ fontSize: 60, color: 'grey.400', mb: 2 }} />
-              <Typography variant="h6" gutterBottom>
-                No comments yet
-              </Typography>
-              <Typography variant="body2" color="text.secondary">
-                Leave some comments on movies to see them here!
-              </Typography>
-            </Paper>
-          ) : (
-            <Grid container spacing={3}>
-              {comments.map((comment) => (
-                <Grid item xs={12} sm={6} md={4} key={`${comment.imdbId}-${comment.id}`}>
-                  <MovieCard item={comment} type="comment" />
-                </Grid>
-              ))}
-            </Grid>
-          )}
-        </Box>
-      )}
+      {/* Movies Tab */}
+{activeTab === 1 && (
+  <Box>
+    {favorites.movies.length === 0 ? (
+      <Paper sx={{ p: 4, textAlign: 'center' }}>
+        <Movie sx={{ fontSize: 60, color: 'grey.400', mb: 2 }} />
+        <Typography variant="h6" gutterBottom>
+          No movie favorites yet
+        </Typography>
+        <Typography variant="body2" color="text.secondary">
+          Start adding movies to your favorites to see them here!
+        </Typography>
+      </Paper>
+    ) : (
+      <Grid container spacing={3}>
+        {favorites.movies.map((favorite) => (
+          <Grid item xs={12} sm={6} md={4} key={favorite.imdbId}>
+            <MovieCard 
+              item={favorite} 
+              type="favorite"
+              onRemove={removeFavorite}
+            />
+          </Grid>
+        ))}
+      </Grid>
+    )}
+  </Box>
+)}
+{/* Series Tab */}
+{activeTab === 2 && (
+  <Box>
+    {favorites.series.length === 0 ? (
+      <Paper sx={{ p: 4, textAlign: 'center' }}>
+        <LiveTv sx={{ fontSize: 60, color: 'grey.400', mb: 2 }} />
+        <Typography variant="h6" gutterBottom>
+          No series favorites yet
+        </Typography>
+        <Typography variant="body2" color="text.secondary">
+          Start adding series to your favorites to see them here!
+        </Typography>
+      </Paper>
+    ) : (
+      <Grid container spacing={3}>
+        {favorites.series.map((favorite) => (
+          <Grid item xs={12} sm={6} md={4} key={favorite.imdbId}>
+            <MovieCard 
+              item={favorite} 
+              type="favorite"
+              onRemove={removeFavorite}
+            />
+          </Grid>
+        ))}
+      </Grid>
+    )}
+  </Box>
+)}
+{/* Ratings Tab */}
+{activeTab === 3 && (
+  <Box>
+    {ratings.length === 0 ? (
+      <Paper sx={{ p: 4, textAlign: 'center' }}>
+        <Star sx={{ fontSize: 60, color: 'grey.400', mb: 2 }} />
+        <Typography variant="h6" gutterBottom>
+          No ratings yet
+        </Typography>
+        <Typography variant="body2" color="text.secondary">
+          Rate some movies to see your ratings here!
+        </Typography>
+      </Paper>
+    ) : (
+      <Grid container spacing={3}>
+        {ratings.map((rating) => (
+          <Grid item xs={12} sm={6} md={4} key={`${rating.imdbId}-${rating.id}`}>
+            <MovieCard item={rating} type="rating" />
+          </Grid>
+        ))}
+      </Grid>
+    )}
+  </Box>
+)}
+{/* Comments Tab */}
+{activeTab === 4 && (
+  <Box>
+    {comments.length === 0 ? (
+      <Paper sx={{ p: 4, textAlign: 'center' }}>
+        <Comment sx={{ fontSize: 60, color: 'grey.400', mb: 2 }} />
+        <Typography variant="h6" gutterBottom>
+          No comments yet
+        </Typography>
+        <Typography variant="body2" color="text.secondary">
+          Leave some comments on movies to see them here!
+        </Typography>
+      </Paper>
+    ) : (
+      <Grid container spacing={3}>
+        {comments.map((comment) => (
+          <Grid item xs={12} sm={6} md={4} key={`${comment.imdbId}-${comment.id}`}>
+            <MovieCard item={comment} type="comment" />
+          </Grid>
+        ))}
+      </Grid>
+    )}
+  </Box>
+)}
 
       {/* Image Preview Dialog */}
       <Dialog open={openImageDialog} onClose={handleCloseImageDialog}>
