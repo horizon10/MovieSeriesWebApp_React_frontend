@@ -260,19 +260,21 @@ const fetchFavorites = async () => {
     }
   };
 
-  useEffect(() => {
-    const loadData = async () => {
-      setLoading(true);
-      try {
-        await Promise.all([
-          fetchFavorites(),
-          fetchUserComments(),
-          fetchUserRatings()
-        ]);
-      } finally {
-        setLoading(false);
-      }
-    };
+ useEffect(() => {
+  const loadData = async () => {
+    if (!user) return;
+    
+    setLoading(true);
+    try {
+      await Promise.all([
+        fetchFavorites(),
+        fetchUserComments(),
+        fetchUserRatings()
+      ]);
+    } finally {
+      setLoading(false);
+    }
+  };
     
     if (user) {
       loadData();
@@ -284,7 +286,7 @@ const fetchFavorites = async () => {
         newPassword: '',
         confirmPassword: ''
       });
-      setImagePreview(user.image);
+      setImagePreview(user.image || '');
     }
   }, [user]);
 
@@ -427,12 +429,13 @@ const fetchFavorites = async () => {
   const handleSaveProfile = async () => {
   if (!validateForm()) return;
 
-  try {
-    // Username check if changed
+ try {
+    // Kullanıcı adı değiştiyse kontrol et
     if (editData.username !== user.username) {
-      const usernameCheck = await userApi.checkUsername(editData.username);
-      if (usernameCheck.data) {
-        showAlert('error', 'This username is already taken');
+      const response = await userApi.checkUsername(editData.username, user.id);
+      
+      if (!response.data.available) {
+        showAlert('error', 'Bu kullanıcı adı zaten alınmış');
         return;
       }
     }
@@ -440,14 +443,16 @@ const fetchFavorites = async () => {
     // Create payload with basic info
     const payload = {
       username: editData.username.trim(),
-      email: editData.email.trim(),
-      image: editData.image
+      email: editData.email.trim()
     };
 
+    if (editData.image) {
+      payload.image = editData.image;
+    }
     // Only include password fields if changePassword is true
-    if (changePassword) {
+    if (changePassword && editData.newPassword) {
+      payload.currentPassword = editData.currentPassword;
       payload.password = editData.newPassword.trim();
-      // Remove confirmPassword as it shouldn't be sent to the backend
     }
 
     // Debugging: log the payload before sending

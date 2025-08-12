@@ -85,7 +85,7 @@ const Navbar = () => {
         <Box>
           {user ? (
             <>
-              {user.role === 'ADMIN' && (
+              {(user.role === 'ROLE_ADMIN'|| user.role === 'ROLE_MODERATOR') && (
                 <Button 
                   color="inherit" 
                   component={Link} 

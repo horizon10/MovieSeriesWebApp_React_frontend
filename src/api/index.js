@@ -102,4 +102,24 @@ export const userApi = {
   getUser: (username) => api.get(`/api/users/${username}`),
   updateUser: (id, userData) => api.put(`/api/users/${id}`, userData),
   deleteUser: (id) => api.delete(`/api/users/${id}`),
+checkUsername: (username, currentUserId) =>
+  api.get(`/api/users/check-username/${username}`, {
+    params: { currentUserId }
+  }),
 };
+export const adminApi = {
+  // User management
+  getAllUsers: () => api.get('/api/admin/users'),
+  updateUserRole: (id, role) => api.put(`/api/admin/users/${id}/role`, { role }),
+  deleteUser: (id) => api.delete(`/api/admin/users/${id}`),
+  
+  // Content management
+  getAllComments: () => api.get('/api/admin/comments'),
+  deleteComment: (id) => api.delete(`/api/admin/comments/${id}`),
+};
+
+export const moderatorApi = {
+  // Comment management
+  getAllComments: () => api.get('/api/moderator/comments'),
+  deleteComment: (id) => api.delete(`/api/moderator/comments/${id}`),
+}; 
