@@ -1,10 +1,26 @@
+// src/components/Navbar.js
 import { Link, useNavigate } from 'react-router-dom';
-import { AppBar, Toolbar, Typography, Button, Box, IconButton } from '@mui/material';
+import { 
+  AppBar, 
+  Toolbar, 
+  Typography, 
+  Button, 
+  Box, 
+  IconButton,
+  Tooltip,
+  useTheme as useMuiTheme,
+  Fade
+} from '@mui/material';
 import { useAuth } from '../context/AuthContext';
+import { useTheme } from '../context/ThemeContext';
 import PopcornIcon from '@mui/icons-material/LocalMovies';
+import DarkModeIcon from '@mui/icons-material/DarkMode';
+import LightModeIcon from '@mui/icons-material/LightMode';
 
 const Navbar = () => {
   const { user, logout } = useAuth();
+  const { darkMode, toggleTheme } = useTheme();
+  const muiTheme = useMuiTheme();
   const navigate = useNavigate();
 
   const handleLogout = () => {
@@ -17,9 +33,14 @@ const Navbar = () => {
     <AppBar 
       position="static" 
       sx={{ 
-        background: 'linear-gradient(135deg, #1a1a2e 0%, #16213e 100%)',
-        boxShadow: '0 4px 20px rgba(0, 0, 0, 0.3)',
-        mb: 4
+        background: darkMode 
+          ? 'linear-gradient(135deg, #1a1a2e 0%, #16213e 100%)'
+          : 'linear-gradient(135deg, #2196f3 0%, #1976d2 100%)',
+        boxShadow: darkMode 
+          ? '0 4px 20px rgba(0, 0, 0, 0.3)'
+          : '0 4px 20px rgba(33, 150, 243, 0.3)',
+        mb: 4,
+        transition: 'all 0.3s ease',
       }}
     >
       <Toolbar sx={{ display: 'flex', justifyContent: 'space-between' }}>
@@ -57,7 +78,7 @@ const Navbar = () => {
               sx={{ 
                 fontSize: '1.5rem',
                 '&:hover': {
-                  color: '#f5a623'
+                  color: darkMode ? '#f5a623' : '#ffeb3b'
                 }
               }}
             >
@@ -72,20 +93,44 @@ const Navbar = () => {
             sx={{ 
               mx: 1,
               '&:hover': {
-                color: '#f5a623',
+                color: darkMode ? '#f5a623' : '#ffeb3b',
                 backgroundColor: 'rgba(255,255,255,0.1)'
               }
             }}
           >
-            Home
+            Ana Sayfa
           </Button>
         </Box>
         
-        {/* Right side - User navigation */}
-        <Box>
+        {/* Right side - Theme toggle and user navigation */}
+        <Box sx={{ display: 'flex', alignItems: 'center' }}>
+          {/* Theme Toggle Button */}
+          <Tooltip 
+            title={darkMode ? 'Switch to Light Mode' : 'Switch to Dark Mode'}
+            arrow
+          >
+            <IconButton 
+              onClick={toggleTheme}
+              sx={{ 
+                mx: 1,
+                color: 'inherit',
+                backgroundColor: 'rgba(255,255,255,0.1)',
+                '&:hover': {
+                  backgroundColor: 'rgba(255,255,255,0.2)',
+                  transform: 'rotate(180deg)',
+                },
+                transition: 'all 0.3s ease',
+              }}
+            >
+              <Fade in={true} key={darkMode ? 'dark' : 'light'}>
+                {darkMode ? <LightModeIcon /> : <DarkModeIcon />}
+              </Fade>
+            </IconButton>
+          </Tooltip>
+
           {user ? (
             <>
-              {(user.role === 'ROLE_ADMIN'|| user.role === 'ROLE_MODERATOR') && (
+              {(user.role === 'ROLE_ADMIN' || user.role === 'ROLE_MODERATOR') && (
                 <Button 
                   color="inherit" 
                   component={Link} 
@@ -93,9 +138,12 @@ const Navbar = () => {
                   sx={{ 
                     mx: 1,
                     backgroundColor: 'rgba(255,165,0,0.2)',
+                    borderRadius: 2,
                     '&:hover': {
-                      backgroundColor: 'rgba(255,165,0,0.3)'
-                    }
+                      backgroundColor: 'rgba(255,165,0,0.3)',
+                      transform: 'translateY(-2px)',
+                    },
+                    transition: 'all 0.2s ease'
                   }}
                 >
                   Admin
@@ -107,25 +155,32 @@ const Navbar = () => {
                 to="/profile"
                 sx={{ 
                   mx: 1,
+                  borderRadius: 2,
                   '&:hover': {
-                    color: '#f5a623'
-                  }
+                    color: darkMode ? '#f5a623' : '#ffeb3b',
+                    backgroundColor: 'rgba(255,255,255,0.1)',
+                    transform: 'translateY(-2px)',
+                  },
+                  transition: 'all 0.2s ease'
                 }}
               >
-                My Profile
+                Profilim
               </Button>
               <Button 
                 color="inherit" 
                 onClick={handleLogout}
                 sx={{ 
                   mx: 1,
-                  backgroundColor: 'rgba(255,0,0,0.2)',
+                  backgroundColor: 'rgba(244,67,54,0.2)',
+                  borderRadius: 2,
                   '&:hover': {
-                    backgroundColor: 'rgba(255,0,0,0.3)'
-                  }
+                    backgroundColor: 'rgba(244,67,54,0.3)',
+                    transform: 'translateY(-2px)',
+                  },
+                  transition: 'all 0.2s ease'
                 }}
               >
-                Logout
+                Çıkış Yap
               </Button>
             </>
           ) : (
@@ -136,12 +191,16 @@ const Navbar = () => {
                 to="/login"
                 sx={{ 
                   mx: 1,
+                  borderRadius: 2,
                   '&:hover': {
-                    color: '#f5a623'
-                  }
+                    color: darkMode ? '#f5a623' : '#ffeb3b',
+                    backgroundColor: 'rgba(255,255,255,0.1)',
+                    transform: 'translateY(-2px)',
+                  },
+                  transition: 'all 0.2s ease'
                 }}
               >
-                Login
+                Giriş Yap
               </Button>
               <Button 
                 variant="outlined" 
@@ -150,15 +209,20 @@ const Navbar = () => {
                 to="/register"
                 sx={{ 
                   mx: 1,
-                  borderColor: '#f5a623',
-                  color: '#f5a623',
+                  borderRadius: 2,
+                  borderColor: darkMode ? '#f5a623' : '#ffeb3b',
+                  color: darkMode ? '#f5a623' : '#ffeb3b',
                   '&:hover': {
-                    backgroundColor: 'rgba(245, 166, 35, 0.1)',
-                    borderColor: '#ffc107'
-                  }
+                    backgroundColor: darkMode 
+                      ? 'rgba(245, 166, 35, 0.1)' 
+                      : 'rgba(255, 235, 59, 0.1)',
+                    borderColor: darkMode ? '#ffc107' : '#fff176',
+                    transform: 'translateY(-2px)',
+                  },
+                  transition: 'all 0.2s ease'
                 }}
               >
-                Register
+                Kayıt Ol
               </Button>
             </>
           )}

@@ -35,8 +35,10 @@ import FilterListIcon from '@mui/icons-material/FilterList';
 import ExploreIcon from '@mui/icons-material/Explore';
 
 const HomePage = () => {
-  const theme = useTheme();
+   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
+  const isDark = theme.palette.mode === 'dark';
+
   const [searchTerm, setSearchTerm] = useState('');
   const [movies, setMovies] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -167,156 +169,167 @@ const HomePage = () => {
     }
   };
 
+  const MovieCard = ({ movie }) => (
+    <Card 
+      component={Link}
+      to={`/movie/${movie.imdbID}`}
+      sx={{ 
+        height: '400px',
+        display: 'flex', 
+        flexDirection: 'column',
+        transition: 'all 0.3s ease',
+        background: isDark 
+          ? 'rgba(30, 30, 30, 0.8)' 
+          : 'rgba(255, 255, 255, 0.9)',
+        borderRadius: '12px',
+        overflow: 'hidden',
+        border: isDark 
+          ? '1px solid rgba(255, 255, 255, 0.1)' 
+          : '1px solid rgba(0, 0, 0, 0.1)',
+        boxShadow: isDark 
+          ? '0 8px 16px rgba(0,0,0,0.2)' 
+          : '0 8px 16px rgba(0,0,0,0.1)',
+        textDecoration: 'none',
+        '&:hover': {
+          transform: 'translateY(-8px)',
+          boxShadow: isDark 
+            ? '0 12px 24px rgba(0,0,0,0.4)' 
+            : '0 12px 24px rgba(0,0,0,0.2)',
+          '& .poster-overlay': {
+            opacity: 1
+          }
+        }
+      }}
+    >
+      <Box sx={{
+        position: 'relative',
+        height: '100%',
+        width: '100%'
+      }}>
+        <CardMedia
+          component="img"
+          image={movie.Poster !== 'N/A' ? movie.Poster : 'https://via.placeholder.com/300x450?text=No+Poster'}
+          alt={movie.Title}
+          sx={{
+            width: '100%',
+            height: '100%',
+            objectFit: 'cover'
+          }}
+        />
+
+        <Box className="poster-overlay" sx={{
+          position: 'absolute',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          background: 'linear-gradient(to top, rgba(0,0,0,0.9) 0%, rgba(0,0,0,0.5) 50%, rgba(0,0,0,0) 100%)',
+          opacity: 0,
+          transition: 'opacity 0.3s ease',
+          display: 'flex',
+          flexDirection: 'column',
+          justifyContent: 'flex-end',
+          p: 3,
+          color: 'white'
+        }}>
+          <Typography variant="h6" sx={{ 
+            fontWeight: 'bold',
+            mb: 1,
+            textShadow: '0 2px 4px rgba(0,0,0,0.5)'
+          }}>
+            {movie.Title}
+          </Typography>
+          
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+            <Chip 
+              label={movie.Type === 'movie' ? 'Film' : 'Dizi'} 
+              size="small"
+              sx={{
+                fontWeight: 'bold',
+                backgroundColor: movie.Type === 'movie' ? '#1976d2' : '#9c27b0',
+                color: 'white'
+              }}
+            />
+            <Chip 
+              label={movie.Year}
+              size="small"
+              variant="outlined"
+              sx={{
+                borderColor: 'rgba(255,255,255,0.3)',
+                color: 'white'
+              }}
+            />
+          </Box>
+        </Box>
+
+        <Chip 
+          label={movie.Type === 'movie' ? 'Film' : 'Dizi'} 
+          size="small"
+          sx={{
+            position: 'absolute',
+            top: '12px',
+            right: '12px',
+            fontWeight: 'bold',
+            backgroundColor: movie.Type === 'movie' ? '#1976d2' : '#9c27b0',
+            color: 'white',
+            zIndex: 2
+          }}
+        />
+      </Box>
+    </Card>
+  );
+
+
+
+
   const MovieGrid = ({ movies, title }) => (
     <Fade in timeout={800}>
       <Box sx={{ mb: 5 }}>
-        <Paper 
-          elevation={2}
-          sx={{ 
-            p: 3, 
-            mb: 3, 
-            borderRadius: 3,
-            background: 'rgba(30, 30, 30, 0.95)',
-            backdropFilter: 'blur(10px)',
-            border: '1px solid rgba(255, 255, 255, 0.1)'
-          }}
-        >
+
+<Paper 
+  elevation={2}
+  sx={{ 
+    p: 3, 
+    mb: 3, 
+    borderRadius: 3,
+    background: 'rgba(30, 30, 30, 0.7)',
+    backdropFilter: 'blur(10px)',
+    border: '1px solid rgba(255, 255, 255, 0.1)',
+    boxShadow: '0 8px 32px rgba(0, 0, 0, 0.3)'
+  }}
+>
           <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
-            {getCategoryIcon(title)}
-            <Typography 
-              variant="h5" 
-              sx={{ 
-                fontWeight: 'bold',
-                color: '#ffffff',
-                textShadow: '1px 1px 2px rgba(0,0,0,0.3)'
-              }}
-            >
-              {title}
-            </Typography>
+
+<Typography 
+  variant="h5" 
+  sx={{ 
+    fontWeight: 'bold',
+    color: '#ffffff',
+    textShadow: '1px 1px 2px rgba(0,0,0,0.3)',
+    mb: 3,
+    position: 'relative',
+    '&:after': {
+      content: '""',
+      display: 'block',
+      width: '60px',
+      height: '4px',
+      background: 'linear-gradient(45deg, #1976d2, #42a5f5)',
+      borderRadius: '2px',
+      mt: 1
+    }
+  }}
+>
+  {title}
+</Typography>
           </Box>
-          
-          <Grid container spacing={3}>
-            {filterMovies(movies).map((movie) => (
-              <Grid item xs={6} sm={4} md={3} lg={2.4} key={movie.imdbID}>
-                <Card 
-                  sx={{ 
-                    height: '100%', 
-                    display: 'flex', 
-                    flexDirection: 'column',
-                    transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-                    background: 'rgba(25, 118, 210, 0.05)',
-                    backdropFilter: 'blur(10px)',
-                    borderRadius: 3,
-                    overflow: 'hidden',
-                    '&:hover': {
-                      transform: 'translateY(-8px) scale(1.02)',
-                      boxShadow: '0 20px 40px rgba(0,0,0,0.3)',
-                      '& .movie-poster': {
-                        transform: 'scale(1.05)'
-                      }
-                    }
-                  }}
-                >
-                  <Box sx={{ overflow: 'hidden', position: 'relative' }}>
-                    <CardMedia
-                      component="img"
-                      height="280"
-                      image={movie.Poster !== 'N/A' ? movie.Poster : '/placeholder.jpg'}
-                      alt={movie.Title}
-                      className="movie-poster"
-                      sx={{ 
-                        objectFit: 'cover',
-                        transition: 'transform 0.3s ease'
-                      }}
-                    />
-                    <Box
-                      sx={{
-                        position: 'absolute',
-                        top: 8,
-                        right: 8,
-                        zIndex: 1
-                      }}
-                    >
-                      {movie.Type && (
-                        <Chip 
-                          label={movie.Type === 'movie' ? 'Film' : 'Dizi'} 
-                          size="small" 
-                          sx={{ 
-                            fontSize: '0.7rem', 
-                            height: '22px',
-                            fontWeight: 'bold',
-                            background: movie.Type === 'movie' ? 
-                              'rgba(25, 118, 210, 0.9)' : 'rgba(156, 39, 176, 0.9)',
-                            color: 'white',
-                            backdropFilter: 'blur(10px)'
-                          }}
-                        />
-                      )}
-                    </Box>
-                  </Box>
-                  
-                  <CardContent sx={{ flexGrow: 1, p: 2.5 }}>
-                    <Typography 
-                      variant="subtitle1" 
-                      component="div"
-                      sx={{ 
-                        fontWeight: 'bold',
-                        lineHeight: 1.3,
-                        mb: 1.5,
-                        overflow: 'hidden',
-                        textOverflow: 'ellipsis',
-                        display: '-webkit-box',
-                        WebkitLineClamp: 2,
-                        WebkitBoxOrient: 'vertical',
-                        minHeight: '2.6em',
-                        color: '#ffffffff'
-                      }}
-                    >
-                      {movie.Title}
-                    </Typography>
-                    
-                    <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
-                      <Chip 
-                        label={movie.Year}
-                        size="small" 
-                        variant="outlined"
-                        sx={{ 
-                          fontSize: '0.7rem', 
-                          height: '22px',
-                          borderColor: 'rgba(255, 255, 255, 0.2)',
-                          color: 'rgba(255, 255, 255, 0.7)'
-                        }}
-                      />
-                    </Box>
-                    
-                    <Button 
-                      component={Link}
-                      to={`/movie/${movie.imdbID}`}
-                      variant="contained" 
-                      size="small"
-                      fullWidth
-                      sx={{ 
-                        mt: 'auto',
-                        fontSize: '0.8rem', 
-                        py: 1,
-                        borderRadius: 2,
-                        fontWeight: 'bold',
-                        background: 'linear-gradient(45deg, #1976d2, #42a5f5)',
-                        '&:hover': {
-                          background: 'linear-gradient(45deg, #1565c0, #1976d2)',
-                          transform: 'translateY(-1px)',
-                          boxShadow: '0 4px 12px rgba(25, 118, 210, 0.4)'
-                        },
-                        transition: 'all 0.2s ease'
-                      }}
-                    >
-                      Detayları Gör
-                    </Button>
-                  </CardContent>
-                </Card>
-              </Grid>
-            ))}
-          </Grid>
+
+<Grid container spacing={3}>
+  {movies.map((movie) => (
+    <Grid item xs={6} sm={4} md={3} lg={2.4} key={movie.imdbID}>
+      <MovieCard movie={movie} />
+    </Grid>
+  ))}
+</Grid>
         </Paper>
       </Box>
     </Fade>
@@ -325,8 +338,11 @@ const HomePage = () => {
   return (
     <Box sx={{ 
       minHeight: '100vh',
-      background: 'linear-gradient(135deg, #1a1a1a 0%, #2d2d2d 100%)',
-      pb: 4
+      background: isDark 
+        ? 'linear-gradient(135deg, #1a1a1a 0%, #2d2d2d 100%)'
+        : 'linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%)',
+      pb: 4,
+      transition: 'background 0.3s ease'
     }}>
       <Container maxWidth="xl" sx={{ py: 4 }}>
         {/* Hero Search Section */}
@@ -337,14 +353,17 @@ const HomePage = () => {
               p: { xs: 3, md: 5 }, 
               mb: 4, 
               borderRadius: 4,
-              background: 'rgba(30, 30, 30, 0.95)',
+              background: isDark 
+                ? 'rgba(30, 30, 30, 0.95)' 
+                : 'rgba(255, 255, 255, 0.95)',
               backdropFilter: 'blur(15px)',
-              border: '1px solid rgba(255, 255, 255, 0.1)',
+              border: isDark 
+                ? '1px solid rgba(255, 255, 255, 0.1)' 
+                : '1px solid rgba(0, 0, 0, 0.1)',
               position: 'relative',
               overflow: 'hidden'
             }}
           >
-            {/* Decorative Elements */}
             <Box
               sx={{
                 position: 'absolute',
@@ -352,19 +371,21 @@ const HomePage = () => {
                 right: -50,
                 width: 200,
                 height: 200,
-                background: 'radial-gradient(circle, rgba(25, 118, 210, 0.1) 0%, transparent 70%)',
+                background: isDark 
+                  ? 'radial-gradient(circle, rgba(25, 118, 210, 0.1) 0%, transparent 70%)'
+                  : 'radial-gradient(circle, rgba(25, 118, 210, 0.2) 0%, transparent 70%)',
                 borderRadius: '50%'
               }}
             />
             
             <Box sx={{ position: 'relative', zIndex: 1 }}>
               <Box sx={{ textAlign: 'center', mb: 4 }}>
-                <ExploreIcon sx={{ fontSize: 48, color: '#1976d2', mb: 2 }} />
+                <ExploreIcon sx={{ fontSize: 48, color: theme.palette.primary.main, mb: 2 }} />
                 <Typography 
                   variant="h3" 
                   component="h1" 
                   sx={{ 
-                    color: '#ffffff', 
+                    color: theme.palette.text.primary, 
                     fontWeight: 'bold',
                     mb: 1,
                     background: 'linear-gradient(45deg, #1976d2, #42a5f5)',
@@ -375,7 +396,7 @@ const HomePage = () => {
                 >
                   Film ve Dizi Keşfedin
                 </Typography>
-                <Typography variant="h6" sx={{ color: 'rgba(255,255,255,0.7)' }}>
+                <Typography variant="h6" sx={{ color: theme.palette.text.secondary }}>
                   Binlerce film ve dizi arasında aradığınızı bulun
                 </Typography>
               </Box>
@@ -394,18 +415,23 @@ const HomePage = () => {
                   onChange={(e) => setSearchTerm(e.target.value)}
                   onKeyPress={(e) => e.key === 'Enter' && searchMovies()}
                   variant="filled"
-                  InputProps={{
-                    sx: {
-                      backgroundColor: 'rgba(255, 255, 255, 0.95)',
+                  sx={{
+                    '& .MuiFilledInput-root': {
+                      backgroundColor: isDark 
+                        ? 'rgba(255, 255, 255, 0.1)' 
+                        : 'rgba(255, 255, 255, 0.8)',
                       borderRadius: 2,
-                      backdropFilter: 'blur(10px)',
                       '&:hover': {
-                        backgroundColor: 'rgba(255, 255, 255, 1)',
+                        backgroundColor: isDark 
+                          ? 'rgba(255, 255, 255, 0.15)' 
+                          : 'rgba(255, 255, 255, 0.9)',
+                      },
+                      '&.Mui-focused': {
+                        backgroundColor: isDark 
+                          ? 'rgba(255, 255, 255, 0.2)' 
+                          : 'rgba(255, 255, 255, 1)',
                       }
                     }
-                  }}
-                  InputLabelProps={{
-                    sx: { color: 'rgba(0,0,0,0.6)' }
                   }}
                 />
                 <Button 
@@ -424,8 +450,8 @@ const HomePage = () => {
                       boxShadow: '0 6px 20px rgba(25, 118, 210, 0.4)'
                     },
                     '&:disabled': {
-                      background: 'rgba(0,0,0,0.12)',
-                      color: 'rgba(0,0,0,0.26)'
+                      background: theme.palette.action.disabledBackground,
+                      color: theme.palette.action.disabled
                     },
                     transition: 'all 0.3s ease'
                   }}
