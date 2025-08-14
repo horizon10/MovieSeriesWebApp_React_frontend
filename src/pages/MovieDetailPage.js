@@ -21,6 +21,8 @@ import PublicIcon from '@mui/icons-material/Public';
 import MovieIcon from '@mui/icons-material/Movie';
 import PersonIcon from '@mui/icons-material/Person';
 import { useParams, useNavigate } from 'react-router-dom';
+import EditIcon from '@mui/icons-material/Edit';
+import DeleteIcon from '@mui/icons-material/Delete';
 
 const MovieDetailPage = () => {
   const { imdbId } = useParams();
@@ -35,6 +37,8 @@ const MovieDetailPage = () => {
   const [successMessage, setSuccessMessage] = useState('');
   const { user } = useAuth();
   const navigate = useNavigate();
+  const [editingCommentId, setEditingCommentId] = useState(null);
+  const [editingCommentContent, setEditingCommentContent] = useState('');
 
   useEffect(() => {
     const fetchData = async () => {
@@ -51,13 +55,14 @@ const MovieDetailPage = () => {
         }
 
         // Yorumları çek
-        try {
-          const commentRes = await interactionApi.getComments(imdbId);
-          setComments(commentRes.data || []);
-        } catch (err) {
-          console.warn('Comments fetch error:', err);
-          setComments([]);
-        }
+       try {
+  const commentRes = await interactionApi.getComments(imdbId);
+  console.log('Yorumlar:', commentRes.data); // Bu log'u inceleyin
+  setComments(commentRes.data || []);
+} catch (err) {
+  console.warn('Comments fetch error:', err);
+  setComments([]);
+}
 
         // Ortalama puanı çek
         try {
@@ -107,6 +112,56 @@ const MovieDetailPage = () => {
     } catch (err) {
       console.error('Add comment error:', err);
       setError('Yorum eklenirken hata oluştu: ' + (err.response?.data || err.message));
+    }
+  };
+   // Yorum düzenlemeyi başlat
+  const startEditingComment = (commentId, currentContent) => {
+    setEditingCommentId(commentId);
+    setEditingCommentContent(currentContent);
+  };
+
+  // Yorum düzenlemeyi iptal et
+  const cancelEditing = () => {
+    setEditingCommentId(null);
+    setEditingCommentContent('');
+  };
+
+  // Yorumu güncelle
+  const handleUpdateComment = async () => {
+    if (!editingCommentContent.trim()) {
+      setError('Yorum boş olamaz');
+      return;
+    }
+
+    try {
+      setError(null);
+      await interactionApi.updateComment(editingCommentId, editingCommentContent.trim());
+      
+      // Yorumları yenile
+      const updated = await interactionApi.getComments(imdbId);
+      setComments(updated.data || []);
+      setEditingCommentId(null);
+      setEditingCommentContent('');
+      setSuccessMessage('Yorum başarıyla güncellendi');
+    } catch (err) {
+      console.error('Update comment error:', err);
+      setError('Yorum güncellenirken hata oluştu: ' + (err.response?.data || err.message));
+    }
+  };
+
+  // Yorum silme
+  const handleDeleteComment = async (commentId) => {
+    try {
+      setError(null);
+      await interactionApi.deleteComment(commentId);
+      
+      // Yorumları yenile
+      const updated = await interactionApi.getComments(imdbId);
+      setComments(updated.data || []);
+      setSuccessMessage('Yorum başarıyla silindi');
+    } catch (err) {
+      console.error('Delete comment error:', err);
+      setError('Yorum silinirken hata oluştu: ' + (err.response?.data || err.message));
     }
   };
 
@@ -533,63 +588,111 @@ const MovieDetailPage = () => {
 
             {/* Yorumlar Listesi */}
             {comments.length > 0 ? (
-              <List sx={{ maxHeight: 500, overflow: 'auto' }}>
-                {comments.map((comment, index) => (
-                  <Box key={comment.id || index}>
-                    <ListItem 
-                      alignItems="flex-start"
-                      sx={{
-                        borderRadius: 2,
-                        mb: 1,
-                        background: 'rgba(0,0,0,0.02)',
-                        '&:hover': {
-                          background: 'rgba(25, 118, 210, 0.05)'
-                        }
-                      }}
-                    >
-                      <Avatar 
-            sx={{ mr: 2, mt: 0.5, bgcolor: 'primary.main' }}
-            src={comment.userImage || undefined}
+    <List sx={{ maxHeight: 500, overflow: 'auto' }}>
+      {comments.map((comment, index) => (
+        <Box key={comment.id || index}>
+          <ListItem 
+            alignItems="flex-start"
+            sx={{
+              borderRadius: 2,
+              mb: 1,
+              background: 'rgba(0,0,0,0.02)',
+              '&:hover': {
+                background: 'rgba(25, 118, 210, 0.05)'
+              }
+            }}
           >
-            {!comment.userImage && <PersonIcon />}
-          </Avatar>
-                      <ListItemText
-  primary={
-    <Typography variant="subtitle1" sx={{ fontWeight: 'bold', color: 'primary.main' }}>
-      {comment.username || 'Anonim Kullanıcı'}
-    </Typography>
-  }
-  secondary={
-    <>
-      <Typography
-        variant="body1"
-        component="div"
-        sx={{ 
-          mt: 1,
-          mb: 1,
-          color: 'text.primary',
-          lineHeight: 1.6
-        }}
-      >
-        {comment.content}
-      </Typography>
-      <Typography 
-        variant="caption" 
-        component="div" 
-        color="text.secondary"
-      >
-        {comment.createdAt ? new Date(comment.createdAt).toLocaleString('tr-TR') : 'Şimdi'}
-      </Typography>
-    </>
-  }
-  secondaryTypographyProps={{ component: "div" }}
-/>
-                    </ListItem>
-                    {index < comments.length - 1 && <Divider sx={{ my: 1 }} />}
-                  </Box>
-                ))}
-              </List>
+            <Avatar 
+              sx={{ mr: 2, mt: 0.5, bgcolor: 'primary.main' }}
+              src={comment.userImage || undefined}
+            >
+              {!comment.userImage && <PersonIcon />}
+            </Avatar>
+{editingCommentId === comment.id ? (
+              <Box sx={{ width: '100%' }}>
+                <TextField
+                  fullWidth
+                  variant="outlined"
+                  value={editingCommentContent}
+                  onChange={(e) => setEditingCommentContent(e.target.value)}
+                  multiline
+                  rows={3}
+                  sx={{ mb: 2 }}
+                />
+                <Box display="flex" justifyContent="flex-end" gap={1}>
+                  <Button 
+                    variant="outlined" 
+                    onClick={cancelEditing}
+                    sx={{ borderRadius: 2 }}
+                  >
+                    İptal
+                  </Button>
+                  <Button 
+                    variant="contained" 
+                    onClick={handleUpdateComment}
+                    disabled={!editingCommentContent.trim()}
+                    sx={{ borderRadius: 2 }}
+                  >
+                    Güncelle
+                  </Button>
+                </Box>
+              </Box>
             ) : (
+              <Box sx={{ width: '100%' }}>
+                <Box display="flex" justifyContent="space-between" alignItems="flex-start">
+                  <ListItemText
+                    primary={
+                      <Typography variant="subtitle1" sx={{ fontWeight: 'bold', color: 'primary.main' }}>
+                        {comment.username || 'Anonim Kullanıcı'}
+                      </Typography>
+                    }
+                    secondary={
+                      <>
+                        <Typography
+                          variant="body1"
+                          component="div"
+                          sx={{ 
+                            mt: 1,
+                            mb: 1,
+                            color: 'text.primary',
+                            lineHeight: 1.6
+                          }}
+                        >
+                          {comment.content}
+                        </Typography>
+                        <Typography 
+                          variant="caption" 
+                          component="div" 
+                          color="text.secondary"
+                        >
+                          {comment.createdAt ? new Date(comment.createdAt).toLocaleString('tr-TR') : 'Şimdi'}
+                        </Typography>
+                      </>
+                    }
+                    secondaryTypographyProps={{ component: "div" }}
+                  />
+                  
+                  {/* Yalnızca kendi yorumlarını düzenleyebilir */}
+              {user && comment.userId === user.id && (
+  <Box>
+    <IconButton onClick={() => startEditingComment(comment.id, comment.content)} size="small" sx={{ ml: 1 }}>
+      <EditIcon fontSize="small" />
+    </IconButton>
+    <IconButton onClick={() => handleDeleteComment(comment.id)} size="small" sx={{ ml: 1 }}>
+      <DeleteIcon fontSize="small" />
+    </IconButton>
+  </Box>
+)}
+
+                </Box>
+              </Box>
+            )}
+          </ListItem>
+          {index < comments.length - 1 && <Divider sx={{ my: 1 }} />}
+        </Box>
+      ))}
+    </List>
+  ) : (
               <Paper 
                 sx={{ 
                   p: 4, 

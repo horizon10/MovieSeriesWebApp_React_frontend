@@ -100,6 +100,21 @@ const Navbar = () => {
           >
             Ana Sayfa
           </Button>
+          <Button
+  color="inherit"
+  component={Link}
+  to="/contact"
+  sx={{
+    mx: 1,
+    '&:hover': {
+      color: darkMode ? '#f5a623' : '#ffeb3b',
+      backgroundColor: 'rgba(255,255,255,0.1)'
+    }
+  }}
+>
+  İletişim
+</Button>
+
         </Box>
         
         {/* Right side - Theme toggle and user navigation */}

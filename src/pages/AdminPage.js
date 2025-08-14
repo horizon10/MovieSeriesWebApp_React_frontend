@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
-import { userApi, interactionApi, adminApi, moderatorApi } from '../api';
+import { userApi, adminApi, moderatorApi } from '../api';
 import { useAuth } from '../context/AuthContext';
+import { useTheme } from '@mui/material/styles';
 import {
   Typography,
   Box,
@@ -27,13 +28,16 @@ import {
   Tabs,
   Tab,
   IconButton,
-  Tooltip
+  Tooltip,
+  Avatar
 } from '@mui/material';
 import {
   Delete as DeleteIcon,
   Edit as EditIcon,
   Person as PersonIcon,
-  Comment as CommentIcon
+  Comment as CommentIcon,
+  Email as EmailIcon,
+  ContactMail as ContactMailIcon
 } from '@mui/icons-material';
 
 function TabPanel(props) {
@@ -52,6 +56,8 @@ function TabPanel(props) {
 }
 
 const AdminPage = () => {
+  const theme = useTheme();
+  const isDark = theme.palette.mode === 'dark';
   const { user } = useAuth();
   const [activeTab, setActiveTab] = useState(0);
 
@@ -62,6 +68,10 @@ const AdminPage = () => {
   // Comment management state (admin + moderator)
   const [comments, setComments] = useState([]);
   const [loadingComments, setLoadingComments] = useState(false);
+
+  // Contact messages state (admin only)
+  const [contactMessages, setContactMessages] = useState([]);
+  const [loadingContactMessages, setLoadingContactMessages] = useState(false);
   
   // Common state
   const [error, setError] = useState('');
@@ -75,7 +85,7 @@ const AdminPage = () => {
   });
 
   // Fetch users (admin only)
-  const fetchUsers = async () => {
+ const fetchUsers = async () => {
     if (user?.role !== 'ROLE_ADMIN') return;
     
     setLoadingUsers(true);
@@ -91,7 +101,6 @@ const AdminPage = () => {
       setLoadingUsers(false);
     }
   };
-
   // Fetch comments (admin + moderator)
   const fetchComments = async () => {
     if (!['ROLE_ADMIN', 'ROLE_MODERATOR'].includes(user?.role)) return;
@@ -119,14 +128,48 @@ const AdminPage = () => {
     }
   };
 
+  // Fetch contact messages (admin only)
+  const fetchContactMessages = async () => {
+    if (user?.role !== 'ROLE_ADMIN') return;
+    
+    setLoadingContactMessages(true);
+    setError('');
+    try {
+      const response = await adminApi.getAllContactMessages();
+      setContactMessages(response.data || []);
+    } catch (error) {
+      console.error('Failed to fetch contact messages:', error);
+      setError('Mesajları getirirken hata oluştu');
+    } finally {
+      setLoadingContactMessages(false);
+    }
+  };
+
   useEffect(() => {
     if (user?.role === 'ROLE_ADMIN') {
       fetchUsers();
+      fetchContactMessages();
     }
     if (['ROLE_ADMIN', 'ROLE_MODERATOR'].includes(user?.role)) {
       fetchComments();
     }
   }, [user]);
+
+  // Contact message handlers
+  const handleDeleteContactMessage = async (id) => {
+    if (!window.confirm('Bu mesajı silmek istediğinizden emin misiniz?')) return;
+    
+    try {
+      await adminApi.deleteContactMessage(id);
+      setSuccess('Mesaj başarıyla silindi');
+      fetchContactMessages();
+      setTimeout(() => setSuccess(''), 3000);
+    } catch (error) {
+      console.error('Failed to delete message:', error);
+      setError('Mesaj silinirken hata oluştu');
+      setTimeout(() => setError(''), 3000);
+    }
+  };
 
   // User management handlers
   const handleEditUser = (userData) => {
@@ -143,7 +186,7 @@ const AdminPage = () => {
     if (!window.confirm('Bu kullanıcıyı silmek istediğinizden emin misiniz?')) return;
     
     try {
-      await userApi.deleteUser(id);
+      await adminApi.deleteUser(id);
       setSuccess('Kullanıcı başarıyla silindi');
       fetchUsers();
       setTimeout(() => setSuccess(''), 3000);
@@ -192,27 +235,19 @@ const AdminPage = () => {
 
   const getRoleColor = (role) => {
     switch (role) {
-      case 'ROLE_ADMIN':
-        return 'error';
-      case 'ROLE_MODERATOR':
-        return 'warning';
-      case 'ROLE_USER':
-        return 'primary';
-      default:
-        return 'default';
+      case 'ROLE_ADMIN': return 'error';
+      case 'ROLE_MODERATOR': return 'warning';
+      case 'ROLE_USER': return 'primary';
+      default: return 'default';
     }
   };
 
   const getRoleLabel = (role) => {
     switch (role) {
-      case 'ROLE_ADMIN':
-        return 'Admin';
-      case 'ROLE_MODERATOR':
-        return 'Moderatör';
-      case 'ROLE_USER':
-        return 'Kullanıcı';
-      default:
-        return 'Bilinmiyor';
+      case 'ROLE_ADMIN': return 'Admin';
+      case 'ROLE_MODERATOR': return 'Moderatör';
+      case 'ROLE_USER': return 'Kullanıcı';
+      default: return 'Bilinmiyor';
     }
   };
 
@@ -239,6 +274,15 @@ const AdminPage = () => {
 
   const handleTabChange = (event, newValue) => {
     setActiveTab(newValue);
+  };
+
+  // Calculate tab indexes based on user role
+  const getTabIndex = (tabName) => {
+    const tabs = [];
+    if (user.role === 'ROLE_ADMIN') tabs.push('users', 'comments', 'contact');
+    else tabs.push('comments');
+    
+    return tabs.indexOf(tabName);
   };
 
   return (
@@ -282,107 +326,204 @@ const AdminPage = () => {
           }}
         >
           {user.role === 'ROLE_ADMIN' && (
-            <Tab 
-              icon={<PersonIcon />} 
-              label="Kullanıcı Yönetimi" 
-              iconPosition="start"
-            />
+            <Tab icon={<PersonIcon />} label="Kullanıcı Yönetimi" iconPosition="start" />
           )}
-          <Tab 
-            icon={<CommentIcon />} 
-            label="Yorum Yönetimi" 
-            iconPosition="start"
-          />
+          <Tab icon={<CommentIcon />} label="Yorum Yönetimi" iconPosition="start" />
+          {user.role === 'ROLE_ADMIN' && (
+            <Tab icon={<ContactMailIcon />} label="İletişim Mesajları" iconPosition="start" />
+          )}
         </Tabs>
       </Paper>
 
       {/* User Management Tab (Admin only) */}
       {user.role === 'ROLE_ADMIN' && (
-        <TabPanel value={activeTab} index={0}>
-          <Card>
-            <CardContent>
-              <Typography variant="h5" gutterBottom sx={{ 
-                display: 'flex', 
-                alignItems: 'center',
-                color: 'primary.main',
-                fontWeight: 'bold'
-              }}>
-                <PersonIcon sx={{ mr: 1 }} />
-                Kullanıcı Yönetimi
-              </Typography>
+  <TabPanel value={activeTab} index={getTabIndex('users')}>
+    <Card>
+      <CardContent>
+        <Typography variant="h5" gutterBottom sx={{ 
+          display: 'flex', 
+          alignItems: 'center',
+          color: 'primary.main',
+          fontWeight: 'bold'
+        }}>
+          <PersonIcon sx={{ mr: 1 }} />
+          Kullanıcı Yönetimi
+        </Typography>
 
-              {loadingUsers ? (
-                <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}>
-                  <CircularProgress size={40} />
-                </Box>
-              ) : (
-                <TableContainer component={Paper} elevation={0} sx={{ border: '1px solid #e0e0e0' }}>
-                  <Table>
-                    <TableHead sx={{ bgcolor: 'grey.50' }}>
-                      <TableRow>
-                        <TableCell sx={{ fontWeight: 'bold' }}>ID</TableCell>
-                        <TableCell sx={{ fontWeight: 'bold' }}>Kullanıcı Adı</TableCell>
-                        <TableCell sx={{ fontWeight: 'bold' }}>E-posta</TableCell>
-                        <TableCell sx={{ fontWeight: 'bold' }}>Rol</TableCell>
-                        <TableCell align="center" sx={{ fontWeight: 'bold' }}>İşlemler</TableCell>
-                      </TableRow>
-                    </TableHead>
-                    <TableBody>
-                      {users.length > 0 ? (
-                        users.map((userData) => (
-                          <TableRow key={userData.id} hover>
-                            <TableCell>{userData.id}</TableCell>
-                            <TableCell>{userData.username}</TableCell>
-                            <TableCell>{userData.email}</TableCell>
-                            <TableCell>
-                              <Chip
-                                label={getRoleLabel(userData.role)}
-                                color={getRoleColor(userData.role)}
-                                size="small"
-                              />
-                            </TableCell>
-                            <TableCell align="center">
-                              <Tooltip title="Düzenle">
-                                <IconButton
-                                  size="small"
-                                  color="primary"
-                                  onClick={() => handleEditUser(userData)}
-                                >
-                                  <EditIcon />
-                                </IconButton>
-                              </Tooltip>
-                              <Tooltip title="Sil">
-                                <IconButton
-                                  size="small"
-                                  color="error"
-                                  onClick={() => handleDeleteUser(userData.id)}
-                                >
-                                  <DeleteIcon />
-                                </IconButton>
-                              </Tooltip>
-                            </TableCell>
-                          </TableRow>
-                        ))
-                      ) : (
-                        <TableRow>
-                          <TableCell colSpan={5} align="center" sx={{ py: 3 }}>
-                            <Typography variant="body1" color="text.secondary">
-                              Henüz kullanıcı bulunmuyor
-                            </Typography>
-                          </TableCell>
-                        </TableRow>
-                      )}
-                    </TableBody>
-                  </Table>
-                </TableContainer>
-              )}
-            </CardContent>
-          </Card>
-        </TabPanel>
-      )}
+        {loadingUsers ? (
+          <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}>
+            <CircularProgress size={40} />
+          </Box>
+        ) : (
+          <TableContainer 
+            component={Paper} 
+            elevation={0} 
+            sx={{ 
+              border: theme.palette.mode === 'dark' 
+                ? '1px solid rgba(255, 255, 255, 0.12)' 
+                : '1px solid #e0e0e0',
+              borderRadius: 2
+            }}
+          >
+            <Table>
+              <TableHead 
+                sx={{ 
+                  bgcolor: theme.palette.mode === 'dark' 
+                    ? 'rgba(255, 255, 255, 0.05)' 
+                    : 'grey.50'
+                }}
+              >
+                <TableRow>
+                  <TableCell sx={{ 
+                    fontWeight: 'bold',
+                    color: theme.palette.text.primary,
+                    borderBottom: theme.palette.mode === 'dark' 
+                      ? '1px solid rgba(255, 255, 255, 0.12)' 
+                      : '1px solid rgba(224, 224, 224, 1)'
+                  }}>
+                    ID
+                  </TableCell>
+                  <TableCell sx={{ 
+                    fontWeight: 'bold',
+                    color: theme.palette.text.primary,
+                    borderBottom: theme.palette.mode === 'dark' 
+                      ? '1px solid rgba(255, 255, 255, 0.12)' 
+                      : '1px solid rgba(224, 224, 224, 1)'
+                  }}>
+                    Kullanıcı Adı
+                  </TableCell>
+                  <TableCell sx={{ 
+                    fontWeight: 'bold',
+                    color: theme.palette.text.primary,
+                    borderBottom: theme.palette.mode === 'dark' 
+                      ? '1px solid rgba(255, 255, 255, 0.12)' 
+                      : '1px solid rgba(224, 224, 224, 1)'
+                  }}>
+                    E-posta
+                  </TableCell>
+                  <TableCell sx={{ 
+                    fontWeight: 'bold',
+                    color: theme.palette.text.primary,
+                    borderBottom: theme.palette.mode === 'dark' 
+                      ? '1px solid rgba(255, 255, 255, 0.12)' 
+                      : '1px solid rgba(224, 224, 224, 1)'
+                  }}>
+                    Rol
+                  </TableCell>
+                  <TableCell align="center" sx={{ 
+                    fontWeight: 'bold',
+                    color: theme.palette.text.primary,
+                    borderBottom: theme.palette.mode === 'dark' 
+                      ? '1px solid rgba(255, 255, 255, 0.12)' 
+                      : '1px solid rgba(224, 224, 224, 1)'
+                  }}>
+                    İşlemler
+                  </TableCell>
+                </TableRow>
+              </TableHead>
+              <TableBody>
+                {users.length > 0 ? (
+                  users.map((userData) => (
+                    <TableRow 
+                      key={userData.id} 
+                      hover
+                      sx={{
+                        '&:hover': {
+                          backgroundColor: theme.palette.mode === 'dark' 
+                            ? 'rgba(255, 255, 255, 0.08)' 
+                            : 'rgba(0, 0, 0, 0.04)'
+                        }
+                      }}
+                    >
+                      <TableCell sx={{ 
+                        color: theme.palette.text.primary,
+                        borderBottom: theme.palette.mode === 'dark' 
+                          ? '1px solid rgba(255, 255, 255, 0.08)' 
+                          : '1px solid rgba(224, 224, 224, 1)'
+                      }}>
+                        {userData.id}
+                      </TableCell>
+                      <TableCell sx={{ 
+                        color: theme.palette.text.primary,
+                        borderBottom: theme.palette.mode === 'dark' 
+                          ? '1px solid rgba(255, 255, 255, 0.08)' 
+                          : '1px solid rgba(224, 224, 224, 1)'
+                      }}>
+                        {userData.username}
+                      </TableCell>
+                      <TableCell sx={{ 
+                        color: theme.palette.text.primary,
+                        borderBottom: theme.palette.mode === 'dark' 
+                          ? '1px solid rgba(255, 255, 255, 0.08)' 
+                          : '1px solid rgba(224, 224, 224, 1)'
+                      }}>
+                        {userData.email}
+                      </TableCell>
+                      <TableCell sx={{ 
+                        borderBottom: theme.palette.mode === 'dark' 
+                          ? '1px solid rgba(255, 255, 255, 0.08)' 
+                          : '1px solid rgba(224, 224, 224, 1)'
+                      }}>
+                        <Chip
+                          label={getRoleLabel(userData.role)}
+                          color={getRoleColor(userData.role)}
+                          size="small"
+                        />
+                      </TableCell>
+                      <TableCell align="center" sx={{ 
+                        borderBottom: theme.palette.mode === 'dark' 
+                          ? '1px solid rgba(255, 255, 255, 0.08)' 
+                          : '1px solid rgba(224, 224, 224, 1)'
+                      }}>
+                        <Tooltip title="Düzenle">
+                          <IconButton
+                            size="small"
+                            color="primary"
+                            onClick={() => handleEditUser(userData)}
+                          >
+                            <EditIcon />
+                          </IconButton>
+                        </Tooltip>
+                        <Tooltip title="Sil">
+                          <IconButton
+                            size="small"
+                            color="error"
+                            onClick={() => handleDeleteUser(userData.id)}
+                          >
+                            <DeleteIcon />
+                          </IconButton>
+                        </Tooltip>
+                      </TableCell>
+                    </TableRow>
+                  ))
+                ) : (
+                  <TableRow>
+                    <TableCell 
+                      colSpan={5} 
+                      align="center" 
+                      sx={{ 
+                        py: 3,
+                        color: theme.palette.text.primary,
+                        borderBottom: 'none'
+                      }}
+                    >
+                      <Typography variant="body1" color="text.secondary">
+                        Henüz kullanıcı bulunmuyor
+                      </Typography>
+                    </TableCell>
+                  </TableRow>
+                )}
+              </TableBody>
+            </Table>
+          </TableContainer>
+        )}
+      </CardContent>
+    </Card>
+  </TabPanel>
+)}
 
       {/* Comment Management Tab */}
-      <TabPanel value={activeTab} index={user.role === 'ROLE_ADMIN' ? 1 : 0}>
+      <TabPanel value={activeTab} index={getTabIndex('comments')}>
         <Card>
           <CardContent>
             <Typography variant="h5" gutterBottom sx={{ 
@@ -400,24 +541,109 @@ const AdminPage = () => {
                 <CircularProgress size={40} />
               </Box>
             ) : (
-              <TableContainer component={Paper} elevation={0} sx={{ border: '1px solid #e0e0e0' }}>
+              <TableContainer 
+                component={Paper} 
+                elevation={0} 
+                sx={{ 
+                  border: theme.palette.mode === 'dark' 
+                    ? '1px solid rgba(255, 255, 255, 0.12)' 
+                    : '1px solid #e0e0e0',
+                  borderRadius: 2
+                }}
+              >
                 <Table>
-                  <TableHead sx={{ bgcolor: 'grey.50' }}>
+                  <TableHead 
+                    sx={{ 
+                      bgcolor: theme.palette.mode === 'dark' 
+                        ? 'rgba(255, 255, 255, 0.05)' 
+                        : 'grey.50'
+                    }}
+                  >
                     <TableRow>
-                      <TableCell sx={{ fontWeight: 'bold' }}>ID</TableCell>
-                      <TableCell sx={{ fontWeight: 'bold' }}>İçerik</TableCell>
-                      <TableCell sx={{ fontWeight: 'bold' }}>Film ID</TableCell>
-                      <TableCell sx={{ fontWeight: 'bold' }}>Kullanıcı</TableCell>
-                      <TableCell sx={{ fontWeight: 'bold' }}>Oluşturulma Tarihi</TableCell>
-                      <TableCell align="center" sx={{ fontWeight: 'bold' }}>İşlemler</TableCell>
+                      <TableCell sx={{ 
+                        fontWeight: 'bold',
+                        color: theme.palette.text.primary,
+                        borderBottom: theme.palette.mode === 'dark' 
+                          ? '1px solid rgba(255, 255, 255, 0.12)' 
+                          : '1px solid rgba(224, 224, 224, 1)'
+                      }}>
+                        ID
+                      </TableCell>
+                      <TableCell sx={{ 
+                        fontWeight: 'bold',
+                        color: theme.palette.text.primary,
+                        borderBottom: theme.palette.mode === 'dark' 
+                          ? '1px solid rgba(255, 255, 255, 0.12)' 
+                          : '1px solid rgba(224, 224, 224, 1)'
+                      }}>
+                        İçerik
+                      </TableCell>
+                      <TableCell sx={{ 
+                        fontWeight: 'bold',
+                        color: theme.palette.text.primary,
+                        borderBottom: theme.palette.mode === 'dark' 
+                          ? '1px solid rgba(255, 255, 255, 0.12)' 
+                          : '1px solid rgba(224, 224, 224, 1)'
+                      }}>
+                        Film ID
+                      </TableCell>
+                      <TableCell sx={{ 
+                        fontWeight: 'bold',
+                        color: theme.palette.text.primary,
+                        borderBottom: theme.palette.mode === 'dark' 
+                          ? '1px solid rgba(255, 255, 255, 0.12)' 
+                          : '1px solid rgba(224, 224, 224, 1)'
+                      }}>
+                        Kullanıcı
+                      </TableCell>
+                      <TableCell sx={{ 
+                        fontWeight: 'bold',
+                        color: theme.palette.text.primary,
+                        borderBottom: theme.palette.mode === 'dark' 
+                          ? '1px solid rgba(255, 255, 255, 0.12)' 
+                          : '1px solid rgba(224, 224, 224, 1)'
+                      }}>
+                        Oluşturulma Tarihi
+                      </TableCell>
+                      <TableCell align="center" sx={{ 
+                        fontWeight: 'bold',
+                        color: theme.palette.text.primary,
+                        borderBottom: theme.palette.mode === 'dark' 
+                          ? '1px solid rgba(255, 255, 255, 0.12)' 
+                          : '1px solid rgba(224, 224, 224, 1)'
+                      }}>
+                        İşlemler
+                      </TableCell>
                     </TableRow>
                   </TableHead>
                   <TableBody>
                     {comments.length > 0 ? (
                       comments.map((comment) => (
-                        <TableRow key={comment.id} hover>
-                          <TableCell>{comment.id}</TableCell>
-                          <TableCell>
+                        <TableRow 
+                          key={comment.id} 
+                          hover
+                          sx={{
+                            '&:hover': {
+                              backgroundColor: theme.palette.mode === 'dark' 
+                                ? 'rgba(255, 255, 255, 0.08)' 
+                                : 'rgba(0, 0, 0, 0.04)'
+                            }
+                          }}
+                        >
+                          <TableCell sx={{ 
+                            color: theme.palette.text.primary,
+                            borderBottom: theme.palette.mode === 'dark' 
+                              ? '1px solid rgba(255, 255, 255, 0.08)' 
+                              : '1px solid rgba(224, 224, 224, 1)'
+                          }}>
+                            {comment.id}
+                          </TableCell>
+                          <TableCell sx={{ 
+                            color: theme.palette.text.primary,
+                            borderBottom: theme.palette.mode === 'dark' 
+                              ? '1px solid rgba(255, 255, 255, 0.08)' 
+                              : '1px solid rgba(224, 224, 224, 1)'
+                          }}>
                             <Typography 
                               variant="body2" 
                               sx={{ 
@@ -430,17 +656,42 @@ const AdminPage = () => {
                               {comment.content}
                             </Typography>
                           </TableCell>
-                          <TableCell>{comment.imdbId}</TableCell>
-                          <TableCell>
+                          <TableCell sx={{ 
+                            color: theme.palette.text.primary,
+                            borderBottom: theme.palette.mode === 'dark' 
+                              ? '1px solid rgba(255, 255, 255, 0.08)' 
+                              : '1px solid rgba(224, 224, 224, 1)'
+                          }}>
+                            {comment.imdbId}
+                          </TableCell>
+                          <TableCell sx={{ 
+                            borderBottom: theme.palette.mode === 'dark' 
+                              ? '1px solid rgba(255, 255, 255, 0.08)' 
+                              : '1px solid rgba(224, 224, 224, 1)'
+                          }}>
                             {comment.username ? (
-                              <Chip label={comment.username} size="small" variant="outlined" />
+                              <Chip 
+                                label={comment.username} 
+                                size="small" 
+                                variant="outlined" 
+                                sx={{
+                                  borderColor: theme.palette.mode === 'dark' 
+                                    ? 'rgba(255, 255, 255, 0.23)' 
+                                    : 'rgba(0, 0, 0, 0.23)'
+                                }}
+                              />
                             ) : (
                               <Typography variant="body2" color="text.secondary" fontStyle="italic">
                                 Silinmiş Kullanıcı
                               </Typography>
                             )}
                           </TableCell>
-                          <TableCell>
+                          <TableCell sx={{ 
+                            color: theme.palette.text.primary,
+                            borderBottom: theme.palette.mode === 'dark' 
+                              ? '1px solid rgba(255, 255, 255, 0.08)' 
+                              : '1px solid rgba(224, 224, 224, 1)'
+                          }}>
                             {comment.createdAt ? 
                               new Date(comment.createdAt).toLocaleDateString('tr-TR', {
                                 year: 'numeric',
@@ -452,7 +703,11 @@ const AdminPage = () => {
                               '-'
                             }
                           </TableCell>
-                          <TableCell align="center">
+                          <TableCell align="center" sx={{ 
+                            borderBottom: theme.palette.mode === 'dark' 
+                              ? '1px solid rgba(255, 255, 255, 0.08)' 
+                              : '1px solid rgba(224, 224, 224, 1)'
+                          }}>
                             <Tooltip title="Yorumu Sil">
                               <IconButton
                                 size="small"
@@ -467,7 +722,15 @@ const AdminPage = () => {
                       ))
                     ) : (
                       <TableRow>
-                        <TableCell colSpan={6} align="center" sx={{ py: 3 }}>
+                        <TableCell 
+                          colSpan={6} 
+                          align="center" 
+                          sx={{ 
+                            py: 3,
+                            color: theme.palette.text.primary,
+                            borderBottom: 'none'
+                          }}
+                        >
                           <Typography variant="body1" color="text.secondary">
                             Henüz yorum bulunmuyor
                           </Typography>
@@ -481,6 +744,214 @@ const AdminPage = () => {
           </CardContent>
         </Card>
       </TabPanel>
+
+      {/* Contact Messages Tab (Admin only) */}
+      {user.role === 'ROLE_ADMIN' && (
+        <TabPanel value={activeTab} index={getTabIndex('contact')}>
+          <Card>
+            <CardContent>
+              <Typography variant="h5" gutterBottom sx={{ 
+                display: 'flex', 
+                alignItems: 'center',
+                color: 'primary.main',
+                fontWeight: 'bold'
+              }}>
+                <ContactMailIcon sx={{ mr: 1 }} />
+                İletişim Mesajları
+              </Typography>
+
+              {loadingContactMessages ? (
+                <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}>
+                  <CircularProgress size={40} />
+                </Box>
+              ) : (
+                <TableContainer 
+                  component={Paper} 
+                  elevation={0} 
+                  sx={{ 
+                    border: theme.palette.mode === 'dark' 
+                      ? '1px solid rgba(255, 255, 255, 0.12)' 
+                      : '1px solid #e0e0e0',
+                    borderRadius: 2
+                  }}
+                >
+                  <Table>
+                    <TableHead 
+                      sx={{ 
+                        bgcolor: theme.palette.mode === 'dark' 
+                          ? 'rgba(255, 255, 255, 0.05)' 
+                          : 'grey.50'
+                      }}
+                    >
+                      <TableRow>
+                        <TableCell sx={{ 
+                          fontWeight: 'bold',
+                          color: theme.palette.text.primary,
+                          borderBottom: theme.palette.mode === 'dark' 
+                            ? '1px solid rgba(255, 255, 255, 0.12)' 
+                            : '1px solid rgba(224, 224, 224, 1)'
+                        }}>
+                          Gönderen
+                        </TableCell>
+                        <TableCell sx={{ 
+                          fontWeight: 'bold',
+                          color: theme.palette.text.primary,
+                          borderBottom: theme.palette.mode === 'dark' 
+                            ? '1px solid rgba(255, 255, 255, 0.12)' 
+                            : '1px solid rgba(224, 224, 224, 1)'
+                        }}>
+                          E-posta
+                        </TableCell>
+                        <TableCell sx={{ 
+                          fontWeight: 'bold',
+                          color: theme.palette.text.primary,
+                          borderBottom: theme.palette.mode === 'dark' 
+                            ? '1px solid rgba(255, 255, 255, 0.12)' 
+                            : '1px solid rgba(224, 224, 224, 1)'
+                        }}>
+                          Mesaj
+                        </TableCell>
+                        <TableCell sx={{ 
+                          fontWeight: 'bold',
+                          color: theme.palette.text.primary,
+                          borderBottom: theme.palette.mode === 'dark' 
+                            ? '1px solid rgba(255, 255, 255, 0.12)' 
+                            : '1px solid rgba(224, 224, 224, 1)'
+                        }}>
+                          Tarih
+                        </TableCell>
+                        <TableCell align="center" sx={{ 
+                          fontWeight: 'bold',
+                          color: theme.palette.text.primary,
+                          borderBottom: theme.palette.mode === 'dark' 
+                            ? '1px solid rgba(255, 255, 255, 0.12)' 
+                            : '1px solid rgba(224, 224, 224, 1)'
+                        }}>
+                          İşlemler
+                        </TableCell>
+                      </TableRow>
+                    </TableHead>
+                    <TableBody>
+                      {contactMessages.length > 0 ? (
+                        contactMessages.map((message) => (
+                          <TableRow 
+                            key={message.id} 
+                            hover
+                            sx={{
+                              '&:hover': {
+                                backgroundColor: theme.palette.mode === 'dark' 
+                                  ? 'rgba(255, 255, 255, 0.08)' 
+                                  : 'rgba(0, 0, 0, 0.04)'
+                              }
+                            }}
+                          >
+                            <TableCell sx={{ 
+                              color: theme.palette.text.primary,
+                              borderBottom: theme.palette.mode === 'dark' 
+                                ? '1px solid rgba(255, 255, 255, 0.08)' 
+                                : '1px solid rgba(224, 224, 224, 1)'
+                            }}>
+                              <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                                <Avatar 
+                                  sx={{ 
+                                    width: 32, 
+                                    height: 32, 
+                                    mr: 1, 
+                                    bgcolor: 'primary.main',
+                                    color: 'white'
+                                  }}
+                                >
+                                  {message.name?.charAt(0)?.toUpperCase() || '?'}
+                                </Avatar>
+                                {message.name || 'Bilinmiyor'}
+                              </Box>
+                            </TableCell>
+                            <TableCell sx={{ 
+                              color: theme.palette.text.primary,
+                              borderBottom: theme.palette.mode === 'dark' 
+                                ? '1px solid rgba(255, 255, 255, 0.08)' 
+                                : '1px solid rgba(224, 224, 224, 1)'
+                            }}>
+                              {message.email || '-'}
+                            </TableCell>
+                            <TableCell sx={{ 
+                              color: theme.palette.text.primary,
+                              borderBottom: theme.palette.mode === 'dark' 
+                                ? '1px solid rgba(255, 255, 255, 0.08)' 
+                                : '1px solid rgba(224, 224, 224, 1)'
+                            }}>
+                              <Typography 
+                                variant="body2" 
+                                sx={{ 
+                                  maxWidth: 300, 
+                                  overflow: 'hidden',
+                                  textOverflow: 'ellipsis',
+                                  whiteSpace: 'nowrap'
+                                }}
+                              >
+                                {message.message || '-'}
+                              </Typography>
+                            </TableCell>
+                            <TableCell sx={{ 
+                              color: theme.palette.text.primary,
+                              borderBottom: theme.palette.mode === 'dark' 
+                                ? '1px solid rgba(255, 255, 255, 0.08)' 
+                                : '1px solid rgba(224, 224, 224, 1)'
+                            }}>
+                              {message.createdAt ? 
+                                new Date(message.createdAt).toLocaleDateString('tr-TR', {
+                                  year: 'numeric',
+                                  month: 'short',
+                                  day: 'numeric',
+                                  hour: '2-digit',
+                                  minute: '2-digit'
+                                }) : 
+                                '-'
+                              }
+                            </TableCell>
+                            <TableCell align="center" sx={{ 
+                              borderBottom: theme.palette.mode === 'dark' 
+                                ? '1px solid rgba(255, 255, 255, 0.08)' 
+                                : '1px solid rgba(224, 224, 224, 1)'
+                            }}>
+                              <Tooltip title="Mesajı Sil">
+                                <IconButton
+                                  size="small"
+                                  color="error"
+                                  onClick={() => handleDeleteContactMessage(message.id)}
+                                >
+                                  <DeleteIcon />
+                                </IconButton>
+                              </Tooltip>
+                            </TableCell>
+                          </TableRow>
+                        ))
+                      ) : (
+                        <TableRow>
+                          <TableCell 
+                            colSpan={5} 
+                            align="center" 
+                            sx={{ 
+                              py: 3,
+                              color: theme.palette.text.primary,
+                              borderBottom: 'none'
+                            }}
+                          >
+                            <Typography variant="body1" color="text.secondary">
+                              Henüz mesaj bulunmuyor
+                            </Typography>
+                          </TableCell>
+                        </TableRow>
+                      )}
+                    </TableBody>
+                  </Table>
+                </TableContainer>
+              )}
+            </CardContent>
+          </Card>
+        </TabPanel>
+      )}
+
 
       {/* Edit User Dialog */}
       <Dialog 

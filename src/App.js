@@ -13,6 +13,8 @@ import PrivateRoute from './routes/PrivateRoute';
 import AdminRoute from './routes/AdminRoute';
 import Navbar from './components/Navbar';
 import ResetPasswordPage from './pages/ResetPasswordPage';
+import ContactPage from "./pages/ContactPage";
+
 
 function App() {
   return (
@@ -30,6 +32,7 @@ function App() {
             <Route path="/movie/:imdbId" element={<MovieDetailPage />} />
             <Route path="/profile" element={<PrivateRoute><UserProfilePage /></PrivateRoute>} />
             <Route path="/admin" element={<AdminRoute><AdminPage /></AdminRoute>} />
+            <Route path="/contact" element={<ContactPage />} />
           </Routes>
         </Router>
       </AuthProvider>

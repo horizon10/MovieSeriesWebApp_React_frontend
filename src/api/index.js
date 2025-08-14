@@ -29,6 +29,7 @@ api.interceptors.response.use(
   }
 );
 
+
 export const authApi = {
   register: (userData) => api.post('/login/save', userData),
   login: (credentials) => api.post('/login/auth', credentials),
@@ -86,6 +87,11 @@ export const interactionApi = {
   getComments: (imdbId) => api.get(`/api/home/comment/${imdbId}`),
   getUserComments: () => api.get('/api/home/comment/user'),
   deleteComment: (commentId) => api.delete(`/api/home/comment/${commentId}`),
+  updateComment: (commentId, newContent) => api.put(`/api/home/comment/${commentId}`, newContent, {
+    headers: {
+      'Content-Type': 'text/plain'
+    }
+  }),
   addRating: (imdbId, score) => api.post(`/api/home/rate/${imdbId}`, score, {
     headers: {
       'Content-Type': 'application/json'
@@ -116,6 +122,11 @@ export const adminApi = {
   // Content management
   getAllComments: () => api.get('/api/admin/comments'),
   deleteComment: (id) => api.delete(`/api/admin/comments/${id}`),
+  
+  // Contact message management
+  getAllContactMessages: () => api.get('/api/admin/contact'),
+  deleteContactMessage: (id) => api.delete(`/api/admin/contact/${id}`),
+  sendContactMessage: (message) => api.post('/api/home/contact', message)
 };
 
 export const moderatorApi = {
@@ -123,3 +134,27 @@ export const moderatorApi = {
   getAllComments: () => api.get('/api/moderator/comments'),
   deleteComment: (id) => api.delete(`/api/moderator/comments/${id}`),
 }; 
+
+
+api.interceptors.response.use(
+  response => response,
+  error => {
+    // Özel hata işleme
+    if (error.code === 'ECONNABORTED') {
+      throw { message: 'İstek zaman aşımına uğradı', isTimeout: true };
+    }
+    
+    if (!error.response) {
+      throw { message: 'Ağ bağlantı hatası', isNetworkError: true };
+    }
+    
+    // Backend'den gelen özel mesaj
+    const serverMessage = error.response.data?.message;
+    
+    throw {
+      message: serverMessage || 'Beklenmeyen sunucu hatası',
+      status: error.response.status,
+      data: error.response.data
+    };
+  }
+);
