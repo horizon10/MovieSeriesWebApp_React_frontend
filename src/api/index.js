@@ -76,15 +76,19 @@ export const omdbApiId = {
 };
 
 export const interactionApi = {
+  // Favori işlemleri
   addFavorite: (imdbId) => api.post(`/api/home/favorite/${imdbId}`, ""),
   removeFavorite: (imdbId) => api.delete(`/api/home/favorite/${imdbId}`),
   getFavorites: () => api.get('/api/home/favorite'),
+
+  // Yorum işlemleri
   addComment: (imdbId, content) => api.post(`/api/home/comment/${imdbId}`, content, {
     headers: {
       'Content-Type': 'text/plain'
     }
   }),
   getComments: (imdbId) => api.get(`/api/home/comment/${imdbId}`),
+  getCommentsWithLikes: (imdbId) => api.get(`/api/home/comment/${imdbId}/with-likes`),
   getUserComments: () => api.get('/api/home/comment/user'),
   deleteComment: (commentId) => api.delete(`/api/home/comment/${commentId}`),
   updateComment: (commentId, newContent) => api.put(`/api/home/comment/${commentId}`, newContent, {
@@ -92,6 +96,14 @@ export const interactionApi = {
       'Content-Type': 'text/plain'
     }
   }),
+
+  // Yorum beğenme işlemleri
+  likeComment: (commentId) => api.post(`/api/home/comment/${commentId}/like`),
+  unlikeComment: (commentId) => api.delete(`/api/home/comment/${commentId}/like`),
+  getCommentLikes: (commentId) => api.get(`/api/home/comment/${commentId}/likes`),
+  getUserLikes: () => api.get('/api/home/comment/likes/user'),
+
+  // Puanlama işlemleri
   addRating: (imdbId, score) => api.post(`/api/home/rate/${imdbId}`, score, {
     headers: {
       'Content-Type': 'application/json'
@@ -101,6 +113,14 @@ export const interactionApi = {
   getUserRatings: () => api.get('/api/home/rate/user'),
   deleteRating: (ratingId) => api.delete(`/api/home/rate/${ratingId}`),
   getAverageRating: (imdbId) => api.get(`/api/home/rate/${imdbId}/average`),
+
+  addReply: (parentCommentId, content) => api.post(`/api/home/comment/${parentCommentId}/reply`, content, {
+    headers: {
+      'Content-Type': 'text/plain'
+    }
+  }),
+  getReplies: (commentId) => api.get(`/api/home/comment/${commentId}/replies`),
+  getCommentsWithReplies: (imdbId) => api.get(`/api/home/comment/${imdbId}/with-replies`),
 };
 
 export const userApi = {

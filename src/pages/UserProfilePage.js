@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { LiveTv } from '@mui/icons-material';
 import { interactionApi, omdbApiId, userApi } from '../api';
+import ThumbUpIcon from '@mui/icons-material/ThumbUp';
 import { 
   Typography, 
   Box, 
@@ -66,7 +67,7 @@ const [favorites, setFavorites] = useState({
   const [ratings, setRatings] = useState([]);
   const [loading, setLoading] = useState(false);
   const [movieDetails, setMovieDetails] = useState({});
-  
+  const [likedComments, setLikedComments] = useState([]);
   const [editMode, setEditMode] = useState(false);
   const [editData, setEditData] = useState({
     username: '',
@@ -101,6 +102,70 @@ const [favorites, setFavorites] = useState({
     if (password.match(/[^a-zA-Z\d]/)) strength += 25;
     return strength;
   };
+
+const loadData = async () => {
+  if (!user) return;
+  
+  setLoading(true);
+  try {
+    await Promise.all([
+      fetchFavorites(),
+      fetchUserComments(),
+      fetchUserRatings(),
+      fetchUserLikedComments()
+    ]);
+  } finally {
+    setLoading(false);
+  }
+};
+
+const fetchUserLikedComments = async () => {
+  try {
+    const response = await interactionApi.getUserLikes();
+    const likedCommentsData = response.data;
+
+    const likedCommentsWithDetails = await Promise.all(
+      likedCommentsData.map(async (like) => {
+        try {
+          // Yorum detaylarını al (endpoint düzeltildi)
+          const commentRes = await interactionApi.getCommentLikes(like.commentId);
+          const commentLikes = commentRes.data;
+          
+          // Yorumun kendisini bulmak için yorumları çek
+          // Bu kısımda comment'in kendisini almak için farklı bir endpoint kullanmamız gerekebilir
+          // Şimdilik comment bilgilerini like'dan alacağız
+          
+          // Film detaylarını al
+          let movieDetail = null;
+          if (like.imdbId) {
+            movieDetail = await fetchMovieDetails(like.imdbId);
+          }
+          
+          return {
+            id: like.commentId,
+            content: like.content || 'Yorum içeriği yüklenemedi', // Backend'den gelecek
+            createdAt: like.createdAt || like.likedAt,
+            imdbId: like.imdbId,
+            username: like.username,
+            userId: like.userId,
+            movieDetail,
+            likedAt: like.likedAt,
+            likeCount: commentLikes.length
+          };
+        } catch (error) {
+          console.error('Error fetching comment details:', error);
+          return null;
+        }
+      })
+    );
+
+    // Hatalı isteklerden gelen null değerleri filtrele
+    setLikedComments(likedCommentsWithDetails.filter(comment => comment !== null));
+  } catch (error) {
+    console.error('Error fetching liked comments:', error);
+    setLikedComments([]);
+  }
+};
 
   // Base64 conversion function
   const convertToBase64 = (file) => {
@@ -217,26 +282,41 @@ const fetchFavorites = async () => {
 
 
   // Fetch comments
-  const fetchUserComments = async () => {
-    try {
-      const response = await interactionApi.getUserComments();
-      const commentsData = response.data;
+const fetchUserComments = async () => {
+  try {
+    const response = await interactionApi.getUserComments();
+    const commentsData = response.data;
 
-      const commentsWithDetails = await Promise.all(
-        commentsData.map(async (comment) => {
-          const movieDetail = await fetchMovieDetails(comment.imdbId);
+    const commentsWithDetails = await Promise.all(
+      commentsData.map(async (comment) => {
+        const movieDetail = await fetchMovieDetails(comment.imdbId);
+        
+        // Yorumun beğenilip beğenilmediğini kontrol et
+        try {
+          const likeRes = await interactionApi.getCommentLikes(comment.id);
+          const isLiked = likeRes.data.some(like => like.userId === user.id);
           return {
             ...comment,
-            movieDetail
+            movieDetail,
+            isLiked // Beğeni durumunu ekle
           };
-        })
-      );
+        } catch (error) {
+          console.error('Error checking like status:', error);
+          return {
+            ...comment,
+            movieDetail,
+            isLiked: false
+          };
+        }
+      })
+    );
 
-      setComments(commentsWithDetails);
-    } catch (error) {
-      console.error('Error fetching comments:', error);
-    }
-  };
+    setComments(commentsWithDetails);
+  } catch (error) {
+    console.error('Error fetching comments:', error);
+    setComments([]);
+  }
+};
 
   // Fetch ratings
   const fetchUserRatings = async () => {
@@ -260,35 +340,20 @@ const fetchFavorites = async () => {
     }
   };
 
- useEffect(() => {
-  const loadData = async () => {
-    if (!user) return;
-    
-    setLoading(true);
-    try {
-      await Promise.all([
-        fetchFavorites(),
-        fetchUserComments(),
-        fetchUserRatings()
-      ]);
-    } finally {
-      setLoading(false);
-    }
-  };
-    
-    if (user) {
-      loadData();
-      setEditData({
-        username: user.username,
-        email: user.email,
-        image: user.image,
-        currentPassword: '',
-        newPassword: '',
-        confirmPassword: ''
-      });
-      setImagePreview(user.image || '');
-    }
-  }, [user]);
+useEffect(() => {
+  if (user) {
+    loadData();
+    setEditData({
+      username: user.username,
+      email: user.email,
+      image: user.image,
+      currentPassword: '',
+      newPassword: '',
+      confirmPassword: ''
+    });
+    setImagePreview(user.image || '');
+  }
+}, [user]);
 
   useEffect(() => {
     if (editData.newPassword) {
@@ -507,8 +572,121 @@ const fetchFavorites = async () => {
     if (strength < 75) return 'Good';
     return 'Strong';
   };
+const LikedCommentCard = ({ item, additionalInfo }) => {
+  const movie = item.movieDetail;
+  
+  return (
+    <Card sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
+      {movie && (
+        <CardMedia
+          component="img"
+          height="200"
+          image={movie.Poster !== 'N/A' ? movie.Poster : '/placeholder.jpg'}
+          alt={movie.Title}
+          sx={{ objectFit: 'cover' }}
+        />
+      )}
+      <CardContent sx={{ flexGrow: 1 }}>
+        {movie && (
+          <>
+            <Typography gutterBottom variant="h6" component="div" noWrap>
+              {movie.Title}
+            </Typography>
+            <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+              {movie.Year} • {movie.Genre}
+            </Typography>
+          </>
+        )}
+        
+        <Box sx={{ mb: 2 }}>
+          <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 'bold' }}>
+            Beğendiğiniz yorum:
+          </Typography>
+          <Paper 
+            sx={{ 
+              p: 2, 
+              mt: 1,
+              bgcolor: 'rgba(25, 118, 210, 0.05)',
+              borderLeft: '4px solid',
+              borderColor: 'primary.main',
+              borderRadius: '4px'
+            }}
+          >
+            <Typography 
+              variant="body2" 
+              sx={{ 
+                whiteSpace: 'pre-wrap',
+                wordBreak: 'break-word',
+                fontStyle: 'italic'
+              }}
+            >
+              "{item.content}"
+            </Typography>
+            <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 1 }}>
+              - {item.username}
+            </Typography>
+          </Paper>
+        </Box>
+        
+        <Typography 
+          variant="caption" 
+          color="text.secondary"
+          sx={{ display: 'block', mb: 1 }}
+        >
+          Beğenildi: {new Date(item.likedAt).toLocaleDateString('tr-TR')}
+        </Typography>
+        
+        {additionalInfo && (
+          <Typography variant="caption" color="text.secondary" sx={{ display: 'block' }}>
+            {additionalInfo}
+          </Typography>
+        )}
+        
+        {movie && (
+          <Box sx={{ mt: 2 }}>
+            <Link to={`/movie/${movie.imdbID}`} style={{ textDecoration: 'none' }}>
+              <Chip 
+                label="Filme Git" 
+                size="small" 
+                clickable
+                color="primary"
+                variant="outlined"
+              />
+            </Link>
+          </Box>
+        )}
+      </CardContent>
+    </Card>
+  );
+};
 
-  const MovieCard = ({ item, type, onRemove }) => {
+// Liked Comments Tab içeriğini güncelle (activeTab === 5):
+{activeTab === 5 && (
+  <Box>
+    {likedComments.length === 0 ? (
+      <Paper sx={{ p: 4, textAlign: 'center' }}>
+        <ThumbUpIcon sx={{ fontSize: 60, color: 'grey.400', mb: 2 }} />
+        <Typography variant="h6" gutterBottom>
+          Henüz beğenilen yorum yok
+        </Typography>
+        <Typography variant="body2" color="text.secondary">
+          Yorumları beğenmeye başlayın!
+        </Typography>
+      </Paper>
+    ) : (
+      <Grid container spacing={3}>
+        {likedComments.map((comment) => (
+          <Grid item xs={12} sm={6} md={4} key={`liked-${comment.id}-${comment.likedAt}`}>
+            <LikedCommentCard 
+              item={comment}
+            />
+          </Grid>
+        ))}
+      </Grid>
+    )}
+  </Box>
+)}
+  const MovieCard = ({ item, type, onRemove, additionalInfo }) => {
     const movie = item.movieDetail;
     if (!movie) return null;
 
@@ -593,20 +771,25 @@ const fetchFavorites = async () => {
       sx={{ display: 'block', mt: 1 }}
     >
       Commented: {new Date(item.createdAt).toLocaleDateString()}
-    </Typography>
-    <Box sx={{ mt: 1, textAlign: 'right' }}>
-      <Tooltip title="Delete comment">
-        <IconButton 
-          size="small" 
-          color="error"
-          onClick={() => deleteComment(item.id)}
-        >
-          <Delete fontSize="small" />
-        </IconButton>
-      </Tooltip>
-    </Box>
-  </Box>
-)}
+            </Typography>
+            {additionalInfo && (
+              <Typography variant="caption" color="text.secondary" sx={{ display: 'block' }}>
+                {additionalInfo}
+              </Typography>
+            )}
+            <Box sx={{ mt: 1, textAlign: 'right' }}>
+              <Tooltip title="Delete comment">
+                <IconButton 
+                  size="small" 
+                  color="error"
+                  onClick={() => deleteComment(item.id)}
+                >
+                  <Delete fontSize="small" />
+                </IconButton>
+              </Tooltip>
+            </Box>
+          </Box>
+        )}
           
           <Box sx={{ mt: 2 }}>
             <Link to={`/movie/${movie.imdbID}`} style={{ textDecoration: 'none' }}>
@@ -1072,32 +1255,41 @@ const fetchFavorites = async () => {
       </Card>
 
       {/* Statistics */}
-      <Grid container spacing={3} sx={{ mb: 4 }}>
-        <Grid item xs={12} sm={4}>
-          <StatCard 
-            icon={<Favorite sx={{ fontSize: 40 }} />}
-            title="Favorites"
-            count={favorites.all.length}
-            color="#e91e63"
-          />
-        </Grid>
-        <Grid item xs={12} sm={4}>
-          <StatCard 
-            icon={<Star sx={{ fontSize: 40 }} />}
-            title="Ratings"
-            count={ratings.length}
-            color="#ff9800"
-          />
-        </Grid>
-        <Grid item xs={12} sm={4}>
-          <StatCard 
-            icon={<Comment sx={{ fontSize: 40 }} />}
-            title="Comments"
-            count={comments.length}
-            color="#2196f3"
-          />
-        </Grid>
-      </Grid>
+      {/* Statistics */}
+<Grid container spacing={3} sx={{ mb: 4 }}>
+  <Grid item xs={12} sm={3}>
+    <StatCard 
+      icon={<Favorite sx={{ fontSize: 40 }} />}
+      title="Favorites"
+      count={favorites.all.length}
+      color="#e91e63"
+    />
+  </Grid>
+  <Grid item xs={12} sm={3}>
+    <StatCard 
+      icon={<Star sx={{ fontSize: 40 }} />}
+      title="Ratings"
+      count={ratings.length}
+      color="#ff9800"
+    />
+  </Grid>
+  <Grid item xs={12} sm={3}>
+    <StatCard 
+      icon={<Comment sx={{ fontSize: 40 }} />}
+      title="Comments"
+      count={comments.length}
+      color="#2196f3"
+    />
+  </Grid>
+  <Grid item xs={12} sm={3}>
+    <StatCard 
+      icon={<ThumbUpIcon sx={{ fontSize: 40 }} />}
+      title="Likes"
+      count={likedComments.length}
+      color="#4caf50"
+    />
+  </Grid>
+</Grid>
 
       {/* Tabs */}
       <Paper sx={{ mb: 3 }}>
@@ -1130,6 +1322,11 @@ const fetchFavorites = async () => {
   <Tab 
     icon={<Comment />} 
     label={`Comments (${comments.length})`}
+    iconPosition="start"
+  />
+  <Tab 
+    icon={<ThumbUpIcon />} 
+    label={`Liked (${likedComments.length})`}
     iconPosition="start"
   />
 </Tabs>
@@ -1261,6 +1458,39 @@ const fetchFavorites = async () => {
         {comments.map((comment) => (
           <Grid item xs={12} sm={6} md={4} key={`${comment.imdbId}-${comment.id}`}>
             <MovieCard item={comment} type="comment" />
+          </Grid>
+        ))}
+      </Grid>
+    )}
+  </Box>
+)}
+
+{/* Liked Comments Tab */}
+{activeTab === 5 && (
+  <Box>
+    {likedComments.length === 0 ? (
+      <Paper sx={{ p: 4, textAlign: 'center' }}>
+        <ThumbUpIcon sx={{ fontSize: 60, color: 'grey.400', mb: 2 }} />
+        <Typography variant="h6" gutterBottom>
+          No liked comments yet
+        </Typography>
+        <Typography variant="body2" color="text.secondary">
+          Like some comments to see them here!
+        </Typography>
+      </Paper>
+    ) : (
+      <Grid container spacing={3}>
+        {likedComments.map((comment) => (
+          <Grid item xs={12} sm={6} md={4} key={`${comment.imdbId}-${comment.id}`}>
+            <MovieCard 
+              item={comment} 
+              type="comment"
+              additionalInfo={
+                <Typography variant="caption" color="text.secondary">
+                  Liked on: {new Date(comment.likedAt).toLocaleDateString()}
+                </Typography>
+              }
+            />
           </Grid>
         ))}
       </Grid>
