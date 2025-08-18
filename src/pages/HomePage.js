@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { omdbApi } from '../api';
+import { interactionApi, omdbApi } from '../api';
 import { 
   TextField, 
   Button, 
@@ -33,6 +33,7 @@ import EmojiEmotionsIcon from '@mui/icons-material/EmojiEmotions';
 import MoodBadIcon from '@mui/icons-material/MoodBad';
 import FilterListIcon from '@mui/icons-material/FilterList';
 import ExploreIcon from '@mui/icons-material/Explore';
+import FavoriteIcon from '@mui/icons-material/Favorite';
 
 const HomePage = () => {
    const theme = useTheme();
@@ -50,6 +51,8 @@ const HomePage = () => {
   const [filterType, setFilterType] = useState('all');
   const [filterGenre, setFilterGenre] = useState('all');
   const [loadingCategories, setLoadingCategories] = useState(false);
+  const [mostFavorited, setMostFavorited] = useState([]);
+  const [loadingMostFavorited, setLoadingMostFavorited] = useState(false);
 
   const popularMovieKeywords = [
     'Avengers', 'Spider-Man', 'Batman', 'Superman', 'Star Wars', 
@@ -76,6 +79,31 @@ const HomePage = () => {
     'Step_Brothers', 'Tropic_Thunder', 'Zoolander', 'Wedding_Crashers', 'Meet_the_Parents'
   ];
 
+const fetchMostFavorited = async () => {
+  setLoadingMostFavorited(true);
+  try {
+    const response = await interactionApi.getMostFavorited();
+    if (response.data) {
+      // API sadece imdbId listesi dönüyor, detayları tek tek çekiyoruz
+      const moviePromises = response.data.map(async (imdbId) => {
+        try {
+          const movieResponse = await omdbApi.searchById(imdbId);
+          return movieResponse.data;
+        } catch (error) {
+          console.error(`Error fetching movie ${imdbId}:`, error);
+          return null;
+        }
+      });
+      
+      const movies = await Promise.all(moviePromises);
+      setMostFavorited(movies.filter(movie => movie !== null));
+    }
+  } catch (error) {
+    console.error('Error fetching most favorited:', error);
+  } finally {
+    setLoadingMostFavorited(false);
+  }
+};
   const fetchCategoryMovies = async (keywords, setterFunction) => {
     try {
       const promises = keywords.slice(0, 5).map(async (keyword) => {
@@ -113,7 +141,8 @@ const HomePage = () => {
         fetchCategoryMovies(popularSeriesKeywords, setPopularSeries),
         fetchCategoryMovies(actionKeywords, setActionMovies),
         fetchCategoryMovies(horrorKeywords, setHorrorMovies),
-        fetchCategoryMovies(comedyKeywords, setComedyMovies)
+        fetchCategoryMovies(comedyKeywords, setComedyMovies),
+        fetchMostFavorited()
       ]);
       
       setLoadingCategories(false);
@@ -154,6 +183,8 @@ const HomePage = () => {
 
   const getCategoryIcon = (category) => {
     switch (category) {
+      case '🔥 En Çok Favorilenenler':
+      return <FavoriteIcon sx={{ mr: 1, color: '#e91e63' }} />;
       case '🎬 Popüler Filmler':
         return <MovieIcon sx={{ mr: 1, color: '#1976d2' }} />;
       case '📺 Popüler Diziler':
@@ -565,6 +596,9 @@ const HomePage = () => {
           </Box>
         ) : (
           <>
+          {mostFavorited.length > 0 && (
+      <MovieGrid movies={mostFavorited} title="🔥 En Çok Favorilenenler" />
+    )}
             {popularMovies.length > 0 && (
               <MovieGrid movies={popularMovies} title="🎬 Popüler Filmler" />
             )}

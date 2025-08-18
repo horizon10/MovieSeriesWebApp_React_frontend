@@ -3,9 +3,9 @@ import { useAuth } from '../context/AuthContext';
 import { LiveTv } from '@mui/icons-material';
 import { interactionApi, omdbApiId, userApi } from '../api';
 import ThumbUpIcon from '@mui/icons-material/ThumbUp';
-import { 
-  Typography, 
-  Box, 
+import {
+  Typography,
+  Box,
   Card,
   CardContent,
   Avatar,
@@ -31,12 +31,13 @@ import {
   Alert,
   Collapse,
   Switch,
-  FormControlLabel
+  FormControlLabel,
+  CardActionArea,
 } from '@mui/material';
-import { 
-  Favorite, 
-  Star, 
-  Comment, 
+import {
+  Favorite,
+  Star,
+  Comment,
   Movie,
   Person,
   CalendarToday,
@@ -58,11 +59,11 @@ import imageCompression from 'browser-image-compression';
 const UserProfilePage = () => {
   const { user, updateUser } = useAuth();
   const [activeTab, setActiveTab] = useState(0);
-const [favorites, setFavorites] = useState({
-  all: [],
-  movies: [],
-  series: []
-});
+  const [favorites, setFavorites] = useState({
+    all: [],
+    movies: [],
+    series: []
+  });
   const [comments, setComments] = useState([]);
   const [ratings, setRatings] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -103,69 +104,69 @@ const [favorites, setFavorites] = useState({
     return strength;
   };
 
-const loadData = async () => {
-  if (!user) return;
-  
-  setLoading(true);
-  try {
-    await Promise.all([
-      fetchFavorites(),
-      fetchUserComments(),
-      fetchUserRatings(),
-      fetchUserLikedComments()
-    ]);
-  } finally {
-    setLoading(false);
-  }
-};
+  const loadData = async () => {
+    if (!user) return;
 
-const fetchUserLikedComments = async () => {
-  try {
-    const response = await interactionApi.getUserLikes();
-    const likedCommentsData = response.data;
+    setLoading(true);
+    try {
+      await Promise.all([
+        fetchFavorites(),
+        fetchUserComments(),
+        fetchUserRatings(),
+        fetchUserLikedComments()
+      ]);
+    } finally {
+      setLoading(false);
+    }
+  };
 
-    const likedCommentsWithDetails = await Promise.all(
-      likedCommentsData.map(async (like) => {
-        try {
-          // Yorum detaylarını al (endpoint düzeltildi)
-          const commentRes = await interactionApi.getCommentLikes(like.commentId);
-          const commentLikes = commentRes.data;
-          
-          // Yorumun kendisini bulmak için yorumları çek
-          // Bu kısımda comment'in kendisini almak için farklı bir endpoint kullanmamız gerekebilir
-          // Şimdilik comment bilgilerini like'dan alacağız
-          
-          // Film detaylarını al
-          let movieDetail = null;
-          if (like.imdbId) {
-            movieDetail = await fetchMovieDetails(like.imdbId);
+  const fetchUserLikedComments = async () => {
+    try {
+      const response = await interactionApi.getUserLikes();
+      const likedCommentsData = response.data;
+
+      const likedCommentsWithDetails = await Promise.all(
+        likedCommentsData.map(async (like) => {
+          try {
+            // Yorum detaylarını al (endpoint düzeltildi)
+            const commentRes = await interactionApi.getCommentLikes(like.commentId);
+            const commentLikes = commentRes.data;
+
+            // Yorumun kendisini bulmak için yorumları çek
+            // Bu kısımda comment'in kendisini almak için farklı bir endpoint kullanmamız gerekebilir
+            // Şimdilik comment bilgilerini like'dan alacağız
+
+            // Film detaylarını al
+            let movieDetail = null;
+            if (like.imdbId) {
+              movieDetail = await fetchMovieDetails(like.imdbId);
+            }
+
+            return {
+              id: like.commentId,
+              content: like.content || 'Yorum içeriği yüklenemedi', // Backend'den gelecek
+              createdAt: like.createdAt || like.likedAt,
+              imdbId: like.imdbId,
+              username: like.username,
+              userId: like.userId,
+              movieDetail,
+              likedAt: like.likedAt,
+              likeCount: commentLikes.length
+            };
+          } catch (error) {
+            console.error('Error fetching comment details:', error);
+            return null;
           }
-          
-          return {
-            id: like.commentId,
-            content: like.content || 'Yorum içeriği yüklenemedi', // Backend'den gelecek
-            createdAt: like.createdAt || like.likedAt,
-            imdbId: like.imdbId,
-            username: like.username,
-            userId: like.userId,
-            movieDetail,
-            likedAt: like.likedAt,
-            likeCount: commentLikes.length
-          };
-        } catch (error) {
-          console.error('Error fetching comment details:', error);
-          return null;
-        }
-      })
-    );
+        })
+      );
 
-    // Hatalı isteklerden gelen null değerleri filtrele
-    setLikedComments(likedCommentsWithDetails.filter(comment => comment !== null));
-  } catch (error) {
-    console.error('Error fetching liked comments:', error);
-    setLikedComments([]);
-  }
-};
+      // Hatalı isteklerden gelen null değerleri filtrele
+      setLikedComments(likedCommentsWithDetails.filter(comment => comment !== null));
+    } catch (error) {
+      console.error('Error fetching liked comments:', error);
+      setLikedComments([]);
+    }
+  };
 
   // Base64 conversion function
   const convertToBase64 = (file) => {
@@ -201,14 +202,14 @@ const fetchUserLikedComments = async () => {
       setUploadProgress(30);
       const base64Image = await convertToBase64(compressedFile);
       setUploadProgress(80);
-      
+
       setImagePreview(base64Image);
       setEditData(prev => ({
         ...prev,
         image: base64Image
       }));
       setUploadProgress(100);
-      
+
       setTimeout(() => setUploadProgress(0), 1000);
     } catch (error) {
       console.error("Image compression error:", error);
@@ -218,105 +219,105 @@ const fetchUserLikedComments = async () => {
   };
 
   // Fetch movie details
-const fetchMovieDetails = async (imdbId) => {
-  if (movieDetails[imdbId]) return movieDetails[imdbId];
-  
-  try {
-    const response = await omdbApiId.search(imdbId);
-    const details = response.data;
-    
-    // Daha kesin tür kontrolü yapıyoruz
-    let standardizedType = 'movie'; // Varsayılan olarak film
-    if (details.Type) {
-      const lowerType = details.Type.toLowerCase();
-      if (lowerType.includes('series') || lowerType.includes('tv')) {
-        standardizedType = 'series';
+  const fetchMovieDetails = async (imdbId) => {
+    if (movieDetails[imdbId]) return movieDetails[imdbId];
+
+    try {
+      const response = await omdbApiId.search(imdbId);
+      const details = response.data;
+
+      // Daha kesin tür kontrolü yapıyoruz
+      let standardizedType = 'movie'; // Varsayılan olarak film
+      if (details.Type) {
+        const lowerType = details.Type.toLowerCase();
+        if (lowerType.includes('series') || lowerType.includes('tv')) {
+          standardizedType = 'series';
+        }
       }
+
+      const detailsWithStandardType = {
+        ...details,
+        Type: standardizedType
+      };
+
+      setMovieDetails(prev => ({ ...prev, [imdbId]: detailsWithStandardType }));
+      return detailsWithStandardType;
+    } catch (error) {
+      console.error('Error fetching movie details:', error);
+      return null;
     }
-    
-    const detailsWithStandardType = {
-      ...details,
-      Type: standardizedType
-    };
-    
-    setMovieDetails(prev => ({ ...prev, [imdbId]: detailsWithStandardType }));
-    return detailsWithStandardType;
-  } catch (error) {
-    console.error('Error fetching movie details:', error);
-    return null;
-  }
-};
+  };
 
   // Fetch favorites
-const fetchFavorites = async () => {
-  try {
-    const response = await interactionApi.getFavorites();
-    const favoritesData = response.data;
-    
-    const favoritesWithDetails = await Promise.all(
-      favoritesData.map(async (fav) => {
-        const movieDetail = await fetchMovieDetails(fav.imdbId);
-        // Tür bilgisini standartlaştırılmış şekilde alıyoruz
-        const type = movieDetail?.Type || 'movie';
-        return {
-          ...fav,
-          movieDetail,
-          type
-        };
-      })
-    );
-    
-    // Favorileri türlerine göre kesin olarak ayırıyoruz
-    const movies = favoritesWithDetails.filter(item => item.type === 'movie');
-    const series = favoritesWithDetails.filter(item => item.type === 'series');
-    
-    setFavorites({
-      all: favoritesWithDetails,
-      movies,
-      series
-    });
-  } catch (error) {
-    console.error('Error fetching favorites:', error);
-  }
-};
+  const fetchFavorites = async () => {
+    try {
+      const response = await interactionApi.getFavorites();
+      const favoritesData = response.data;
+
+      const favoritesWithDetails = await Promise.all(
+        favoritesData.map(async (fav) => {
+          const movieDetail = await fetchMovieDetails(fav.imdbId);
+          // Tür bilgisini standartlaştırılmış şekilde alıyoruz
+          const type = movieDetail?.Type || 'movie';
+          return {
+            ...fav,
+            movieDetail,
+            type
+          };
+        })
+      );
+
+      // Favorileri türlerine göre kesin olarak ayırıyoruz
+      const movies = favoritesWithDetails.filter(item => item.type === 'movie');
+      const series = favoritesWithDetails.filter(item => item.type === 'series');
+
+      setFavorites({
+        all: favoritesWithDetails,
+        movies,
+        series
+      });
+    } catch (error) {
+      console.error('Error fetching favorites:', error);
+    }
+  };
 
 
   // Fetch comments
-const fetchUserComments = async () => {
-  try {
-    const response = await interactionApi.getUserComments();
-    const commentsData = response.data;
+  const fetchUserComments = async () => {
+    try {
+      const response = await interactionApi.getUserComments();
+      const commentsData = response.data;
 
-    const commentsWithDetails = await Promise.all(
-      commentsData.map(async (comment) => {
-        const movieDetail = await fetchMovieDetails(comment.imdbId);
-        
-        // Yorumun beğenilip beğenilmediğini kontrol et
-        try {
-          const likeRes = await interactionApi.getCommentLikes(comment.id);
-          const isLiked = likeRes.data.some(like => like.userId === user.id);
-          return {
-            ...comment,
-            movieDetail,
-            isLiked // Beğeni durumunu ekle
-          };
-        } catch (error) {
-          console.error('Error checking like status:', error);
-          return {
-            ...comment,
-            movieDetail,
-            isLiked: false
-          };
-        }
-      })
-    );
+      const commentsWithDetails = await Promise.all(
+        commentsData.map(async (comment) => {
+          const movieDetail = await fetchMovieDetails(comment.imdbId);
 
-    setComments(commentsWithDetails);
-  } catch (error) {
-    console.error('Error fetching comments:', error);
-    setComments([]);
-  }
-};
+          // Yorumun beğenilip beğenilmediğini kontrol et
+          try {
+            const likeRes = await interactionApi.getCommentLikes(comment.id);
+            const isLiked = likeRes.data.some(like => like.userId === user.id);
+            return {
+              ...comment,
+              movieDetail,
+              isLiked // Beğeni durumunu ekle
+            };
+          } catch (error) {
+            console.error('Error checking like status:', error);
+            return {
+              ...comment,
+              movieDetail,
+              isLiked: false
+            };
+          }
+        })
+      );
+
+      setComments(commentsWithDetails);
+    } catch (error) {
+      console.error('Error fetching comments:', error);
+      setComments([]);
+    }
+  };
 
   // Fetch ratings
   const fetchUserRatings = async () => {
@@ -340,20 +341,20 @@ const fetchUserComments = async () => {
     }
   };
 
-useEffect(() => {
-  if (user) {
-    loadData();
-    setEditData({
-      username: user.username,
-      email: user.email,
-      image: user.image,
-      currentPassword: '',
-      newPassword: '',
-      confirmPassword: ''
-    });
-    setImagePreview(user.image || '');
-  }
-}, [user]);
+  useEffect(() => {
+    if (user) {
+      loadData();
+      setEditData({
+        username: user.username,
+        email: user.email,
+        image: user.image,
+        currentPassword: '',
+        newPassword: '',
+        confirmPassword: ''
+      });
+      setImagePreview(user.image || '');
+    }
+  }, [user]);
 
   useEffect(() => {
     if (editData.newPassword) {
@@ -376,10 +377,10 @@ useEffect(() => {
     try {
       await interactionApi.removeFavorite(imdbId);
       setFavorites(prev => ({
-  all: prev.all.filter(fav => fav.imdbId !== imdbId),
-  movies: prev.movies.filter(fav => fav.imdbId !== imdbId),
-  series: prev.series.filter(fav => fav.imdbId !== imdbId)
-}));
+        all: prev.all.filter(fav => fav.imdbId !== imdbId),
+        movies: prev.movies.filter(fav => fav.imdbId !== imdbId),
+        series: prev.series.filter(fav => fav.imdbId !== imdbId)
+      }));
 
       showAlert('success', 'Removed from favorites successfully');
     } catch (error) {
@@ -445,111 +446,111 @@ useEffect(() => {
   };
 
   const validateForm = () => {
-  // Clear any previous alerts
-  setAlerts({ show: false, type: 'info', message: '' });
+    // Clear any previous alerts
+    setAlerts({ show: false, type: 'info', message: '' });
 
-  // Basic field validation
-  if (!editData.username.trim()) {
-    showAlert('error', 'Username is required');
-    return false;
-  }
-  
-  if (!editData.email.trim()) {
-    showAlert('error', 'Email is required');
-    return false;
-  }
-
-  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-  if (!emailRegex.test(editData.email)) {
-    showAlert('error', 'Please enter a valid email address');
-    return false;
-  }
-
-  // Only validate password fields if changePassword is true
-  if (changePassword) {
-    if (!editData.currentPassword) {
-      showAlert('error', 'Current password is required');
+    // Basic field validation
+    if (!editData.username.trim()) {
+      showAlert('error', 'Username is required');
       return false;
     }
-    
-    if (!editData.newPassword) {
-      showAlert('error', 'New password is required');
+
+    if (!editData.email.trim()) {
+      showAlert('error', 'Email is required');
       return false;
     }
-    
-    if (editData.newPassword.length < 8) {
-      showAlert('error', 'New password must be at least 8 characters long');
+
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(editData.email)) {
+      showAlert('error', 'Please enter a valid email address');
       return false;
     }
-    
-    if (editData.newPassword !== editData.confirmPassword) {
-      showAlert('error', 'New passwords do not match');
-      return false;
-    }
-  }
 
-  return true;
-};
+    // Only validate password fields if changePassword is true
+    if (changePassword) {
+      if (!editData.currentPassword) {
+        showAlert('error', 'Current password is required');
+        return false;
+      }
 
-  const handleSaveProfile = async () => {
-  if (!validateForm()) return;
+      if (!editData.newPassword) {
+        showAlert('error', 'New password is required');
+        return false;
+      }
 
- try {
-    // Kullanıcı adı değiştiyse kontrol et
-    if (editData.username !== user.username) {
-      const response = await userApi.checkUsername(editData.username, user.id);
-      
-      if (!response.data.available) {
-        showAlert('error', 'Bu kullanıcı adı zaten alınmış');
-        return;
+      if (editData.newPassword.length < 8) {
+        showAlert('error', 'New password must be at least 8 characters long');
+        return false;
+      }
+
+      if (editData.newPassword !== editData.confirmPassword) {
+        showAlert('error', 'New passwords do not match');
+        return false;
       }
     }
 
-    // Create payload with basic info
-    const payload = {
-      username: editData.username.trim(),
-      email: editData.email.trim()
-    };
+    return true;
+  };
 
-    if (editData.image) {
-      payload.image = editData.image;
-    }
-    // Only include password fields if changePassword is true
-    if (changePassword && editData.newPassword) {
-      payload.currentPassword = editData.currentPassword;
-      payload.password = editData.newPassword.trim();
-    }
+  const handleSaveProfile = async () => {
+    if (!validateForm()) return;
 
-    // Debugging: log the payload before sending
-    console.log('Sending payload:', payload);
+    try {
+      // Kullanıcı adı değiştiyse kontrol et
+      if (editData.username !== user.username) {
+        const response = await userApi.checkUsername(editData.username, user.id);
 
-    const response = await userApi.updateUser(user.id, payload);
-    updateUser(response.data);
-    
-    setEditMode(false);
-    setChangePassword(false);
-    showAlert('success', 'Profile updated successfully!');
-    
-    // Reset password fields after successful update
-    setEditData(prev => ({
-      ...prev,
-      currentPassword: '',
-      newPassword: '',
-      confirmPassword: ''
-    }));
-  } catch (error) {
-    console.error('Error updating profile:', error);
-    
-    if (error.response?.data?.error) {
-      showAlert('error', error.response.data.error);
-    } else if (error.response?.status === 400) {
-      showAlert('error', 'Error updating profile. Please check your information.');
-    } else {
-      showAlert('error', 'An error occurred while updating profile. Please try again.');
+        if (!response.data.available) {
+          showAlert('error', 'Bu kullanıcı adı zaten alınmış');
+          return;
+        }
+      }
+
+      // Create payload with basic info
+      const payload = {
+        username: editData.username.trim(),
+        email: editData.email.trim()
+      };
+
+      if (editData.image) {
+        payload.image = editData.image;
+      }
+      // Only include password fields if changePassword is true
+      if (changePassword && editData.newPassword) {
+        payload.currentPassword = editData.currentPassword;
+        payload.password = editData.newPassword.trim();
+      }
+
+      // Debugging: log the payload before sending
+      console.log('Sending payload:', payload);
+
+      const response = await userApi.updateUser(user.id, payload);
+      updateUser(response.data);
+
+      setEditMode(false);
+      setChangePassword(false);
+      showAlert('success', 'Profile updated successfully!');
+
+      // Reset password fields after successful update
+      setEditData(prev => ({
+        ...prev,
+        currentPassword: '',
+        newPassword: '',
+        confirmPassword: ''
+      }));
+    } catch (error) {
+      console.error('Error updating profile:', error);
+
+      if (error.response?.data?.error) {
+        showAlert('error', error.response.data.error);
+      } else if (error.response?.status === 400) {
+        showAlert('error', 'Error updating profile. Please check your information.');
+      } else {
+        showAlert('error', 'An error occurred while updating profile. Please try again.');
+      }
     }
-  }
-};
-  
+  };
+
 
   const handleOpenImageDialog = () => {
     setOpenImageDialog(true);
@@ -572,241 +573,301 @@ useEffect(() => {
     if (strength < 75) return 'Good';
     return 'Strong';
   };
-const LikedCommentCard = ({ item, additionalInfo }) => {
-  const movie = item.movieDetail;
-  
-  return (
-    <Card sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
-      {movie && (
-        <CardMedia
-          component="img"
-          height="200"
-          image={movie.Poster !== 'N/A' ? movie.Poster : '/placeholder.jpg'}
-          alt={movie.Title}
-          sx={{ objectFit: 'cover' }}
-        />
-      )}
-      <CardContent sx={{ flexGrow: 1 }}>
-        {movie && (
-          <>
-            <Typography gutterBottom variant="h6" component="div" noWrap>
-              {movie.Title}
-            </Typography>
-            <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-              {movie.Year} • {movie.Genre}
-            </Typography>
-          </>
-        )}
-        
-        <Box sx={{ mb: 2 }}>
-          <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 'bold' }}>
-            Beğendiğiniz yorum:
-          </Typography>
-          <Paper 
-            sx={{ 
-              p: 2, 
-              mt: 1,
-              bgcolor: 'rgba(25, 118, 210, 0.05)',
-              borderLeft: '4px solid',
-              borderColor: 'primary.main',
-              borderRadius: '4px'
-            }}
-          >
-            <Typography 
-              variant="body2" 
-              sx={{ 
-                whiteSpace: 'pre-wrap',
-                wordBreak: 'break-word',
-                fontStyle: 'italic'
-              }}
-            >
-              "{item.content}"
-            </Typography>
-            <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 1 }}>
-              - {item.username}
-            </Typography>
-          </Paper>
-        </Box>
-        
-        <Typography 
-          variant="caption" 
-          color="text.secondary"
-          sx={{ display: 'block', mb: 1 }}
-        >
-          Beğenildi: {new Date(item.likedAt).toLocaleDateString('tr-TR')}
-        </Typography>
-        
-        {additionalInfo && (
-          <Typography variant="caption" color="text.secondary" sx={{ display: 'block' }}>
-            {additionalInfo}
-          </Typography>
-        )}
-        
-        {movie && (
-          <Box sx={{ mt: 2 }}>
-            <Link to={`/movie/${movie.imdbID}`} style={{ textDecoration: 'none' }}>
-              <Chip 
-                label="Filme Git" 
-                size="small" 
-                clickable
-                color="primary"
-                variant="outlined"
-              />
-            </Link>
-          </Box>
-        )}
-      </CardContent>
-    </Card>
-  );
-};
 
-// Liked Comments Tab içeriğini güncelle (activeTab === 5):
-{activeTab === 5 && (
-  <Box>
-    {likedComments.length === 0 ? (
-      <Paper sx={{ p: 4, textAlign: 'center' }}>
-        <ThumbUpIcon sx={{ fontSize: 60, color: 'grey.400', mb: 2 }} />
-        <Typography variant="h6" gutterBottom>
-          Henüz beğenilen yorum yok
-        </Typography>
-        <Typography variant="body2" color="text.secondary">
-          Yorumları beğenmeye başlayın!
-        </Typography>
-      </Paper>
-    ) : (
-      <Grid container spacing={3}>
-        {likedComments.map((comment) => (
-          <Grid item xs={12} sm={6} md={4} key={`liked-${comment.id}-${comment.likedAt}`}>
-            <LikedCommentCard 
-              item={comment}
-            />
-          </Grid>
-        ))}
-      </Grid>
-    )}
-  </Box>
-)}
   const MovieCard = ({ item, type, onRemove, additionalInfo }) => {
     const movie = item.movieDetail;
     if (!movie) return null;
-
-    return (
-      <Card sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
-        <CardMedia
-          component="img"
-          height="200"
-          image={movie.Poster !== 'N/A' ? movie.Poster : '/placeholder.jpg'}
-          alt={movie.Title}
-          sx={{ objectFit: 'cover' }}
-        />
-        <CardContent sx={{ flexGrow: 1 }}>
-          <Typography gutterBottom variant="h6" component="div" noWrap>
-            {movie.Title}
-          </Typography>
-          <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
-            {movie.Year} • {movie.Genre}
-          </Typography>
-          
-          {type === 'favorite' && (
-            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mt: 2 }}>
-              <Typography variant="caption" color="text.secondary">
-                Added: {new Date(item.createdAt).toLocaleDateString()}
-              </Typography>
-              <Tooltip title="Remove from favorites">
-                <IconButton 
-                  size="small" 
-                  color="error"
-                  onClick={() => onRemove(item.imdbId)}
-                >
-                  <Delete />
-                </IconButton>
-              </Tooltip>
-            </Box>
-          )}
-          
-          {type === 'rating' && (
-            <Box sx={{ mt: 2 }}>
-              <Rating value={item.score} readOnly size="small" />
-              <Typography variant="caption" display="block" color="text.secondary">
-                Rated: {new Date(item.createdAt).toLocaleDateString()}
-              </Typography>
-              <Box sx={{ mt: 1, textAlign: 'right' }}>
-                <Tooltip title="Delete rating">
-                  <IconButton 
-                    size="small" 
-                    color="error"
-                    onClick={() => deleteRating(item.id)}
-                  >
-                    <Delete fontSize="small" />
-                  </IconButton>
-                </Tooltip>
-              </Box>
-            </Box>
-          )}
-          
-         {type === 'comment' && (
-  <Box sx={{ mt: 2 }}>
-    <Paper 
-      sx={{ 
-        p: 2, 
-        bgcolor: 'black',
-        borderLeft: '4px solid',
-        borderColor: 'primary.main',
-        borderRadius: '4px'
-      }}
-    >
-      <Typography 
-        variant="body1" 
+return (
+      <Card 
         sx={{ 
-          whiteSpace: 'pre-wrap', // Bu satır boşlukların ve satır sonlarının korunmasını sağlar
-          wordBreak: 'break-word' // Uzun kelimeleri satır sonlarında böler
+          height: 300,
+          position: 'relative',
+          borderRadius: 3,
+          overflow: 'hidden',
+          cursor: 'pointer',
+          transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+          '&:hover': {
+            transform: 'translateY(-8px)',
+            boxShadow: '0 20px 40px rgba(0,0,0,0.3)',
+          },
+          '&:hover .overlay': {
+            opacity: 1,
+          },
+          '&:hover .poster': {
+            transform: 'scale(1.05)',
+          }
         }}
       >
-        {item.content}
-      </Typography>
-    </Paper>
-    <Typography 
-      variant="caption" 
-      color="text.secondary"
-      sx={{ display: 'block', mt: 1 }}
-    >
-      Commented: {new Date(item.createdAt).toLocaleDateString()}
-            </Typography>
-            {additionalInfo && (
-              <Typography variant="caption" color="text.secondary" sx={{ display: 'block' }}>
-                {additionalInfo}
-              </Typography>
-            )}
-            <Box sx={{ mt: 1, textAlign: 'right' }}>
-              <Tooltip title="Delete comment">
-                <IconButton 
-                  size="small" 
-                  color="error"
-                  onClick={() => deleteComment(item.id)}
+        {/* Poster Image */}
+        <CardMedia
+          component="img"
+          height="100%"
+          image={movie.Poster !== 'N/A' ? movie.Poster : '/placeholder.jpg'}
+          alt={movie.Title}
+          className="poster"
+          sx={{ 
+            objectFit: 'cover',
+            transition: 'transform 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+          }}
+        />
+        
+        {/* Overlay Content */}
+        <Box
+          className="overlay"
+          sx={{
+            position: 'absolute',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            background: 'linear-gradient(to top, rgba(0,0,0,0.9) 0%, rgba(0,0,0,0.7) 50%, rgba(0,0,0,0.3) 100%)',
+            opacity: 0,
+            transition: 'opacity 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+            display: 'flex',
+            flexDirection: 'column',
+            justifyContent: 'space-between',
+            p: 2,
+            color: 'white'
+          }}
+        >
+          {/* Top Actions */}
+          <Box sx={{ display: 'flex', justifyContent: 'flex-end' }}>
+            {type === 'favorite' && (
+              <Tooltip title="Remove from favorites">
+                <IconButton
+                  size="small"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onRemove(item.imdbId);
+                  }}
+                  sx={{
+                    color: 'white',
+                    backgroundColor: 'rgba(244, 67, 54, 0.8)',
+                    '&:hover': {
+                      backgroundColor: 'rgba(244, 67, 54, 1)',
+                      transform: 'scale(1.1)'
+                    },
+                    transition: 'all 0.2s ease'
+                  }}
                 >
                   <Delete fontSize="small" />
                 </IconButton>
               </Tooltip>
+            )}
+            {type === 'rating' && (
+              <Tooltip title="Delete rating">
+                <IconButton
+                  size="small"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    deleteRating(item.id);
+                  }}
+                  sx={{
+                    color: 'white',
+                    backgroundColor: 'rgba(244, 67, 54, 0.8)',
+                    '&:hover': {
+                      backgroundColor: 'rgba(244, 67, 54, 1)',
+                      transform: 'scale(1.1)'
+                    },
+                    transition: 'all 0.2s ease'
+                  }}
+                >
+                  <Delete fontSize="small" />
+                </IconButton>
+              </Tooltip>
+            )}
+          </Box>
+
+          {/* Bottom Content */}
+          <Box>
+            <Typography 
+              variant="h6" 
+              sx={{ 
+                fontWeight: 'bold', 
+                mb: 1,
+                textShadow: '2px 2px 4px rgba(0,0,0,0.8)',
+                lineHeight: 1.2
+              }}
+            >
+              {movie.Title}
+            </Typography>
+            
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2 }}>
+              <Chip
+                label={movie.Year}
+                size="small"
+                sx={{
+                  backgroundColor: 'rgba(255,255,255,0.2)',
+                  color: 'white',
+                  fontWeight: 'bold'
+                }}
+              />
+              <Typography variant="caption" sx={{ opacity: 0.8 }}>
+                {movie.Genre?.split(',')[0]}
+              </Typography>
+            </Box>
+
+            {/* Type-specific content */}
+            {type === 'rating' && (
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2 }}>
+                <Rating 
+                  value={item.score} 
+                  readOnly 
+                  size="small"
+                  sx={{ 
+                    '& .MuiRating-iconFilled': {
+                      color: '#ffd700',
+                      filter: 'drop-shadow(1px 1px 2px rgba(0,0,0,0.8))'
+                    }
+                  }}
+                />
+                <Typography variant="body2" sx={{ fontWeight: 'bold' }}>
+                  {item.score}/5
+                </Typography>
+              </Box>
+            )}
+
+            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <Typography variant="caption" sx={{ opacity: 0.7 }}>
+                {type === 'favorite' && `Added: ${new Date(item.createdAt).toLocaleDateString()}`}
+                {type === 'rating' && `Rated: ${new Date(item.createdAt).toLocaleDateString()}`}
+              </Typography>
+              
+              <Link to={`/movie/${movie.imdbID}`} style={{ textDecoration: 'none' }}>
+                <Button
+                  size="small"
+                  variant="contained"
+                  sx={{
+                    backgroundColor: 'rgba(255,255,255,0.2)',
+                    color: 'white',
+                    backdropFilter: 'blur(10px)',
+                    border: '1px solid rgba(255,255,255,0.3)',
+                    '&:hover': {
+                      backgroundColor: 'rgba(255,255,255,0.3)',
+                      transform: 'scale(1.05)'
+                    },
+                    transition: 'all 0.2s ease'
+                  }}
+                >
+                  View Details
+                </Button>
+              </Link>
             </Box>
           </Box>
-        )}
-          
-          <Box sx={{ mt: 2 }}>
-            <Link to={`/movie/${movie.imdbID}`} style={{ textDecoration: 'none' }}>
-              <Chip 
-                label="View Details" 
-                size="small" 
-                clickable
-                color="primary"
-                variant="outlined"
-              />
-            </Link>
+        </Box>
+      </Card>
+    );
+  };
+  
+  // Yorum kartı için yeni bileşen
+  const CommentCard = ({ item, onRemove, likedComment = false }) => {
+    const movie = item.movieDetail;
+    if (!movie) return null;
+
+    return (
+      <Card sx={{ height: '100%', display: 'flex', flexDirection: 'column', borderRadius: 2, boxShadow: 3 }}>
+        <CardActionArea component={Link} to={`/movie/${movie.imdbID}`}>
+          <CardMedia
+            component="img"
+            height="180"
+            image={movie.Poster !== 'N/A' ? movie.Poster : '/placeholder.jpg'}
+            alt={movie.Title}
+            sx={{ objectFit: 'cover' }}
+          />
+          <CardContent>
+            <Typography gutterBottom variant="h6" component="div" noWrap>
+              {movie.Title}
+            </Typography>
+            <Typography variant="body2" color="text.secondary">
+              {movie.Year} • {movie.Genre}
+            </Typography>
+          </CardContent>
+        </CardActionArea>
+        <Divider />
+        <CardContent sx={{ flexGrow: 1, display: 'flex', flexDirection: 'column' }}>
+          <Box sx={{ flexGrow: 1 }}>
+            {likedComment ? (
+              <Box sx={{ mb: 2 }}>
+                <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 'bold' }}>
+                  Liked comment:
+                </Typography>
+                <Paper
+                  sx={{
+                    p: 2,
+                    mt: 1,
+                    bgcolor: 'primary.light',
+                    borderLeft: '4px solid',
+                    borderColor: 'primary.main',
+                    borderRadius: '4px'
+                  }}
+                >
+                  <Typography
+                    variant="body2"
+                    sx={{
+                      whiteSpace: 'pre-wrap',
+                      wordBreak: 'break-word',
+                      fontStyle: 'italic',
+                      color: 'primary.contrastText'
+                    }}
+                  >
+                    "{item.content}"
+                  </Typography>
+                  <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 1 }}>
+                    - {item.username}
+                  </Typography>
+                </Paper>
+              </Box>
+            ) : (
+              <Box sx={{ mb: 2 }}>
+                <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 'bold' }}>
+                  Your comment:
+                </Typography>
+                <Paper
+                  sx={{
+                    p: 2,
+                    mt: 1,
+                    bgcolor: 'grey.800',
+                    borderLeft: '4px solid',
+                    borderColor: 'primary.main',
+                    borderRadius: '4px'
+                  }}
+                >
+                  <Typography
+                    variant="body2"
+                    sx={{
+                      whiteSpace: 'pre-wrap',
+                      wordBreak: 'break-word',
+                      color: 'white'
+                    }}
+                  >
+                    {item.content}
+                  </Typography>
+                </Paper>
+              </Box>
+            )}
+          </Box>
+          <Box sx={{ mt: 'auto', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <Typography
+              variant="caption"
+              color="text.secondary"
+            >
+              {likedComment ? `Liked on: ${new Date(item.likedAt).toLocaleDateString()}` : `Commented on: ${new Date(item.createdAt).toLocaleDateString()}`}
+            </Typography>
+            <Tooltip title={likedComment ? "Beğeniyi geri al" : "Yorumu sil"}>
+              <IconButton
+                size="small"
+                color="error"
+                onClick={() => onRemove(item.id)}
+              >
+                <Delete fontSize="small" />
+              </IconButton>
+            </Tooltip>
           </Box>
         </CardContent>
       </Card>
     );
   };
-
+  
   const StatCard = ({ icon, title, count, color }) => (
     <Card sx={{ textAlign: 'center' }}>
       <CardContent>
@@ -835,8 +896,8 @@ const LikedCommentCard = ({ item, additionalInfo }) => {
     <Container maxWidth="lg" sx={{ py: 3 }}>
       {/* Alert Messages */}
       <Collapse in={alerts.show}>
-        <Alert 
-          severity={alerts.type} 
+        <Alert
+          severity={alerts.type}
           sx={{ mb: 2 }}
           onClose={() => setAlerts({ show: false, type: 'info', message: '' })}
         >
@@ -850,10 +911,10 @@ const LikedCommentCard = ({ item, additionalInfo }) => {
           <Box sx={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', flexWrap: 'wrap', gap: 2 }}>
             <Box sx={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 3 }}>
               <Box sx={{ position: 'relative' }}>
-                <Avatar 
-                  sx={{ 
-                    width: 100, 
-                    height: 100, 
+                <Avatar
+                  sx={{
+                    width: 100,
+                    height: 100,
                     bgcolor: 'rgba(255,255,255,0.2)',
                     fontSize: '2.5rem',
                     cursor: editMode ? 'pointer' : 'default'
@@ -889,8 +950,8 @@ const LikedCommentCard = ({ item, additionalInfo }) => {
                       />
                     </IconButton>
                     {uploadProgress > 0 && uploadProgress < 100 && (
-                      <CircularProgress 
-                        variant="determinate" 
+                      <CircularProgress
+                        variant="determinate"
                         value={uploadProgress}
                         size={80}
                         sx={{
@@ -904,7 +965,7 @@ const LikedCommentCard = ({ item, additionalInfo }) => {
                   </>
                 )}
               </Box>
-              
+
               <Box sx={{ flex: 1, minWidth: 250 }}>
                 {editMode ? (
                   <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
@@ -922,7 +983,7 @@ const LikedCommentCard = ({ item, additionalInfo }) => {
                           </InputAdornment>
                         ),
                       }}
-                      sx={{ 
+                      sx={{
                         backgroundColor: 'rgba(255,255,255,0.1)',
                         borderRadius: 1,
                         '& .MuiOutlinedInput-root': {
@@ -959,7 +1020,7 @@ const LikedCommentCard = ({ item, additionalInfo }) => {
                           </InputAdornment>
                         ),
                       }}
-                      sx={{ 
+                      sx={{
                         backgroundColor: 'rgba(255,255,255,0.1)',
                         borderRadius: 1,
                         '& .MuiOutlinedInput-root': {
@@ -982,11 +1043,11 @@ const LikedCommentCard = ({ item, additionalInfo }) => {
                         },
                       }}
                     />
-                    
+
                     <FormControlLabel
                       control={
-                        <Switch 
-                          checked={changePassword} 
+                        <Switch
+                          checked={changePassword}
                           onChange={(e) => setChangePassword(e.target.checked)}
                           sx={{
                             '& .MuiSwitch-switchBase.Mui-checked': {
@@ -1034,7 +1095,7 @@ const LikedCommentCard = ({ item, additionalInfo }) => {
                               </InputAdornment>
                             ),
                           }}
-                          sx={{ 
+                          sx={{
                             backgroundColor: 'rgba(255,255,255,0.1)',
                             borderRadius: 1,
                             '& .MuiOutlinedInput-root': {
@@ -1057,7 +1118,7 @@ const LikedCommentCard = ({ item, additionalInfo }) => {
                             },
                           }}
                         />
-                        
+
                         <TextField
                           name="newPassword"
                           type={showPasswords.new ? 'text' : 'password'}
@@ -1083,7 +1144,7 @@ const LikedCommentCard = ({ item, additionalInfo }) => {
                               </InputAdornment>
                             ),
                           }}
-                          sx={{ 
+                          sx={{
                             backgroundColor: 'rgba(255,255,255,0.1)',
                             borderRadius: 1,
                             '& .MuiOutlinedInput-root': {
@@ -1106,16 +1167,16 @@ const LikedCommentCard = ({ item, additionalInfo }) => {
                             },
                           }}
                         />
-                        
+
                         {editData.newPassword && (
                           <Box sx={{ mt: 1 }}>
                             <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
                               <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.8)' }}>
                                 Password Strength:
                               </Typography>
-                              <Typography 
-                                variant="caption" 
-                                sx={{ 
+                              <Typography
+                                variant="caption"
+                                sx={{
                                   color: getPasswordStrengthColor(passwordStrength),
                                   fontWeight: 'bold'
                                 }}
@@ -1123,18 +1184,18 @@ const LikedCommentCard = ({ item, additionalInfo }) => {
                                 {getPasswordStrengthText(passwordStrength)}
                               </Typography>
                             </Box>
-                            <Box 
-                              sx={{ 
-                                width: '100%', 
-                                height: 4, 
-                                backgroundColor: 'rgba(255,255,255,0.2)', 
-                                borderRadius: 2 
+                            <Box
+                              sx={{
+                                width: '100%',
+                                height: 4,
+                                backgroundColor: 'rgba(255,255,255,0.2)',
+                                borderRadius: 2
                               }}
                             >
-                              <Box 
-                                sx={{ 
-                                  width: `${passwordStrength}%`, 
-                                  height: '100%', 
+                              <Box
+                                sx={{
+                                  width: `${passwordStrength}%`,
+                                  height: '100%',
                                   backgroundColor: getPasswordStrengthColor(passwordStrength),
                                   borderRadius: 2,
                                   transition: 'width 0.3s ease, background-color 0.3s ease'
@@ -1143,7 +1204,7 @@ const LikedCommentCard = ({ item, additionalInfo }) => {
                             </Box>
                           </Box>
                         )}
-                        
+
                         <TextField
                           name="confirmPassword"
                           type={showPasswords.confirm ? 'text' : 'password'}
@@ -1169,7 +1230,7 @@ const LikedCommentCard = ({ item, additionalInfo }) => {
                               </InputAdornment>
                             ),
                           }}
-                          sx={{ 
+                          sx={{
                             backgroundColor: 'rgba(255,255,255,0.1)',
                             borderRadius: 1,
                             '& .MuiOutlinedInput-root': {
@@ -1218,9 +1279,9 @@ const LikedCommentCard = ({ item, additionalInfo }) => {
             </Box>
             {!editMode ? (
               <Tooltip title="Edit Profile">
-                <IconButton 
+                <IconButton
                   onClick={handleEditClick}
-                  sx={{ 
+                  sx={{
                     color: 'white',
                     backgroundColor: 'rgba(255,255,255,0.2)',
                     '&:hover': {
@@ -1233,16 +1294,16 @@ const LikedCommentCard = ({ item, additionalInfo }) => {
               </Tooltip>
             ) : (
               <Box sx={{ display: 'flex', gap: 1 }}>
-                <Button 
-                  variant="contained" 
+                <Button
+                  variant="contained"
                   color="primary"
                   onClick={handleSaveProfile}
                   disabled={uploadProgress > 0 && uploadProgress < 100}
                 >
                   {uploadProgress > 0 && uploadProgress < 100 ? 'Uploading...' : 'Save'}
                 </Button>
-                <Button 
-                  variant="outlined" 
+                <Button
+                  variant="outlined"
                   sx={{ color: 'white', borderColor: 'white' }}
                   onClick={handleCancelEdit}
                 >
@@ -1255,256 +1316,247 @@ const LikedCommentCard = ({ item, additionalInfo }) => {
       </Card>
 
       {/* Statistics */}
-      {/* Statistics */}
-<Grid container spacing={3} sx={{ mb: 4 }}>
-  <Grid item xs={12} sm={3}>
-    <StatCard 
-      icon={<Favorite sx={{ fontSize: 40 }} />}
-      title="Favorites"
-      count={favorites.all.length}
-      color="#e91e63"
-    />
-  </Grid>
-  <Grid item xs={12} sm={3}>
-    <StatCard 
-      icon={<Star sx={{ fontSize: 40 }} />}
-      title="Ratings"
-      count={ratings.length}
-      color="#ff9800"
-    />
-  </Grid>
-  <Grid item xs={12} sm={3}>
-    <StatCard 
-      icon={<Comment sx={{ fontSize: 40 }} />}
-      title="Comments"
-      count={comments.length}
-      color="#2196f3"
-    />
-  </Grid>
-  <Grid item xs={12} sm={3}>
-    <StatCard 
-      icon={<ThumbUpIcon sx={{ fontSize: 40 }} />}
-      title="Likes"
-      count={likedComments.length}
-      color="#4caf50"
-    />
-  </Grid>
-</Grid>
+      <Grid container spacing={3} sx={{ mb: 4 }}>
+        <Grid item xs={12} sm={3}>
+          <StatCard
+            icon={<Favorite sx={{ fontSize: 40 }} />}
+            title="Favorites"
+            count={favorites.all.length}
+            color="#e91e63"
+          />
+        </Grid>
+        <Grid item xs={12} sm={3}>
+          <StatCard
+            icon={<Star sx={{ fontSize: 40 }} />}
+            title="Ratings"
+            count={ratings.length}
+            color="#ff9800"
+          />
+        </Grid>
+        <Grid item xs={12} sm={3}>
+          <StatCard
+            icon={<Comment sx={{ fontSize: 40 }} />}
+            title="Comments"
+            count={comments.length}
+            color="#2196f3"
+          />
+        </Grid>
+        <Grid item xs={12} sm={3}>
+          <StatCard
+            icon={<ThumbUpIcon sx={{ fontSize: 40 }} />}
+            title="Likes"
+            count={likedComments.length}
+            color="#4caf50"
+          />
+        </Grid>
+      </Grid>
 
       {/* Tabs */}
       <Paper sx={{ mb: 3 }}>
-        <Tabs 
-  value={activeTab} 
-  onChange={handleTabChange}
-  variant="fullWidth"
-  sx={{ borderBottom: 1, borderColor: 'divider' }}
->
-  <Tab 
-    icon={<Favorite />} 
-    label={`All (${favorites.all.length})`}
-    iconPosition="start"
-  />
-  <Tab 
-    icon={<Movie />} 
-    label={`Movies (${favorites.movies.length})`}
-    iconPosition="start"
-  />
-  <Tab 
-    icon={<LiveTv />}
-    label={`Series (${favorites.series.length})`}
-    iconPosition="start"
-  />
-  <Tab 
-    icon={<Star />} 
-    label={`Ratings (${ratings.length})`}
-    iconPosition="start"
-  />
-  <Tab 
-    icon={<Comment />} 
-    label={`Comments (${comments.length})`}
-    iconPosition="start"
-  />
-  <Tab 
-    icon={<ThumbUpIcon />} 
-    label={`Liked (${likedComments.length})`}
-    iconPosition="start"
-  />
-</Tabs>
+        <Tabs
+          value={activeTab}
+          onChange={handleTabChange}
+          variant="fullWidth"
+          sx={{ borderBottom: 1, borderColor: 'divider' }}
+        >
+          <Tab
+            icon={<Favorite />}
+            label={`All (${favorites.all.length})`}
+            iconPosition="start"
+          />
+          <Tab
+            icon={<Movie />}
+            label={`Movies (${favorites.movies.length})`}
+            iconPosition="start"
+          />
+          <Tab
+            icon={<LiveTv />}
+            label={`Series (${favorites.series.length})`}
+            iconPosition="start"
+          />
+          <Tab
+            icon={<Star />}
+            label={`Ratings (${ratings.length})`}
+            iconPosition="start"
+          />
+          <Tab
+            icon={<Comment />}
+            label={`Comments (${comments.length})`}
+            iconPosition="start"
+          />
+          <Tab
+            icon={<ThumbUpIcon />}
+            label={`Liked (${likedComments.length})`}
+            iconPosition="start"
+          />
+        </Tabs>
       </Paper>
       {activeTab === 0 && (
-  <Box>
-    {/* Tab Contents */}
-    {favorites.all.length === 0 ? (
-      <Paper sx={{ p: 4, textAlign: 'center' }}>
-        <Favorite sx={{ fontSize: 60, color: 'grey.400', mb: 2 }} />
-        <Typography variant="h6" gutterBottom>
-          No favorites yet
-        </Typography>
-        <Typography variant="body2" color="text.secondary">
-          Start adding movies and series to your favorites to see them here!
-        </Typography>
-      </Paper>
-    ) : (
-      <Grid container spacing={3}>
-        {favorites.all.map((favorite) => (
-          <Grid item xs={12} sm={6} md={4} key={favorite.imdbId}>
-            <MovieCard 
-              item={favorite} 
-              type="favorite"
-              onRemove={removeFavorite}
-            />
-          </Grid>
-        ))}
-      </Grid>
-    )}
-  </Box>
-)}
+        <Box>
+          {/* Tab Contents */}
+          {favorites.all.length === 0 ? (
+            <Paper sx={{ p: 4, textAlign: 'center' }}>
+              <Favorite sx={{ fontSize: 60, color: 'grey.400', mb: 2 }} />
+              <Typography variant="h6" gutterBottom>
+                No favorites yet
+              </Typography>
+              <Typography variant="body2" color="text.secondary">
+                Start adding movies and series to your favorites to see them here!
+              </Typography>
+            </Paper>
+          ) : (
+            <Grid container spacing={3}>
+              {favorites.all.map((favorite) => (
+                <Grid item xs={12} sm={6} md={4} key={favorite.imdbId}>
+                  <MovieCard
+                    item={favorite}
+                    type="favorite"
+                    onRemove={removeFavorite}
+                  />
+                </Grid>
+              ))}
+            </Grid>
+          )}
+        </Box>
+      )}
 
       {/* Movies Tab */}
-{activeTab === 1 && (
-  <Box>
-    {favorites.movies.length === 0 ? (
-      <Paper sx={{ p: 4, textAlign: 'center' }}>
-        <Movie sx={{ fontSize: 60, color: 'grey.400', mb: 2 }} />
-        <Typography variant="h6" gutterBottom>
-          No movie favorites yet
-        </Typography>
-        <Typography variant="body2" color="text.secondary">
-          Start adding movies to your favorites to see them here!
-        </Typography>
-      </Paper>
-    ) : (
-      <Grid container spacing={3}>
-        {favorites.movies.map((favorite) => (
-          <Grid item xs={12} sm={6} md={4} key={favorite.imdbId}>
-            <MovieCard 
-              item={favorite} 
-              type="favorite"
-              onRemove={removeFavorite}
-            />
-          </Grid>
-        ))}
-      </Grid>
-    )}
-  </Box>
-)}
-{/* Series Tab */}
-{activeTab === 2 && (
-  <Box>
-    {favorites.series.length === 0 ? (
-      <Paper sx={{ p: 4, textAlign: 'center' }}>
-        <LiveTv sx={{ fontSize: 60, color: 'grey.400', mb: 2 }} />
-        <Typography variant="h6" gutterBottom>
-          No series favorites yet
-        </Typography>
-        <Typography variant="body2" color="text.secondary">
-          Start adding series to your favorites to see them here!
-        </Typography>
-      </Paper>
-    ) : (
-      <Grid container spacing={3}>
-        {favorites.series.map((favorite) => (
-          <Grid item xs={12} sm={6} md={4} key={favorite.imdbId}>
-            <MovieCard 
-              item={favorite} 
-              type="favorite"
-              onRemove={removeFavorite}
-            />
-          </Grid>
-        ))}
-      </Grid>
-    )}
-  </Box>
-)}
-{/* Ratings Tab */}
-{activeTab === 3 && (
-  <Box>
-    {ratings.length === 0 ? (
-      <Paper sx={{ p: 4, textAlign: 'center' }}>
-        <Star sx={{ fontSize: 60, color: 'grey.400', mb: 2 }} />
-        <Typography variant="h6" gutterBottom>
-          No ratings yet
-        </Typography>
-        <Typography variant="body2" color="text.secondary">
-          Rate some movies to see your ratings here!
-        </Typography>
-      </Paper>
-    ) : (
-      <Grid container spacing={3}>
-        {ratings.map((rating) => (
-          <Grid item xs={12} sm={6} md={4} key={`${rating.imdbId}-${rating.id}`}>
-            <MovieCard item={rating} type="rating" />
-          </Grid>
-        ))}
-      </Grid>
-    )}
-  </Box>
-)}
-{/* Comments Tab */}
-{activeTab === 4 && (
-  <Box>
-    {comments.length === 0 ? (
-      <Paper sx={{ p: 4, textAlign: 'center' }}>
-        <Comment sx={{ fontSize: 60, color: 'grey.400', mb: 2 }} />
-        <Typography variant="h6" gutterBottom>
-          No comments yet
-        </Typography>
-        <Typography variant="body2" color="text.secondary">
-          Leave some comments on movies to see them here!
-        </Typography>
-      </Paper>
-    ) : (
-      <Grid container spacing={3}>
-        {comments.map((comment) => (
-          <Grid item xs={12} sm={6} md={4} key={`${comment.imdbId}-${comment.id}`}>
-            <MovieCard item={comment} type="comment" />
-          </Grid>
-        ))}
-      </Grid>
-    )}
-  </Box>
-)}
+      {activeTab === 1 && (
+        <Box>
+          {favorites.movies.length === 0 ? (
+            <Paper sx={{ p: 4, textAlign: 'center' }}>
+              <Movie sx={{ fontSize: 60, color: 'grey.400', mb: 2 }} />
+              <Typography variant="h6" gutterBottom>
+                No movie favorites yet
+              </Typography>
+              <Typography variant="body2" color="text.secondary">
+                Start adding movies to your favorites to see them here!
+              </Typography>
+            </Paper>
+          ) : (
+            <Grid container spacing={3}>
+              {favorites.movies.map((favorite) => (
+                <Grid item xs={12} sm={6} md={4} key={favorite.imdbId}>
+                  <MovieCard
+                    item={favorite}
+                    type="favorite"
+                    onRemove={removeFavorite}
+                  />
+                </Grid>
+              ))}
+            </Grid>
+          )}
+        </Box>
+      )}
+      {/* Series Tab */}
+      {activeTab === 2 && (
+        <Box>
+          {favorites.series.length === 0 ? (
+            <Paper sx={{ p: 4, textAlign: 'center' }}>
+              <LiveTv sx={{ fontSize: 60, color: 'grey.400', mb: 2 }} />
+              <Typography variant="h6" gutterBottom>
+                No series favorites yet
+              </Typography>
+              <Typography variant="body2" color="text.secondary">
+                Start adding series to your favorites to see them here!
+              </Typography>
+            </Paper>
+          ) : (
+            <Grid container spacing={3}>
+              {favorites.series.map((favorite) => (
+                <Grid item xs={12} sm={6} md={4} key={favorite.imdbId}>
+                  <MovieCard
+                    item={favorite}
+                    type="favorite"
+                    onRemove={removeFavorite}
+                  />
+                </Grid>
+              ))}
+            </Grid>
+          )}
+        </Box>
+      )}
+      {/* Ratings Tab */}
+      {activeTab === 3 && (
+        <Box>
+          {ratings.length === 0 ? (
+            <Paper sx={{ p: 4, textAlign: 'center' }}>
+              <Star sx={{ fontSize: 60, color: 'grey.400', mb: 2 }} />
+              <Typography variant="h6" gutterBottom>
+                No ratings yet
+              </Typography>
+              <Typography variant="body2" color="text.secondary">
+                Rate some movies to see your ratings here!
+              </Typography>
+            </Paper>
+          ) : (
+            <Grid container spacing={3}>
+              {ratings.map((rating) => (
+                <Grid item xs={12} sm={6} md={4} key={`${rating.imdbId}-${rating.id}`}>
+                  <MovieCard item={rating} type="rating" />
+                </Grid>
+              ))}
+            </Grid>
+          )}
+        </Box>
+      )}
+      {/* Comments Tab */}
+      {activeTab === 4 && (
+        <Box>
+          {comments.length === 0 ? (
+            <Paper sx={{ p: 4, textAlign: 'center' }}>
+              <Comment sx={{ fontSize: 60, color: 'grey.400', mb: 2 }} />
+              <Typography variant="h6" gutterBottom>
+                No comments yet
+              </Typography>
+              <Typography variant="body2" color="text.secondary">
+                Leave some comments on movies to see them here!
+              </Typography>
+            </Paper>
+          ) : (
+            <Grid container spacing={3}>
+              {comments.map((comment) => (
+                <Grid item xs={12} sm={6} md={4} key={`${comment.imdbId}-${comment.id}`}>
+                  <CommentCard item={comment} onRemove={deleteComment} />
+                </Grid>
+              ))}
+            </Grid>
+          )}
+        </Box>
+      )}
 
-{/* Liked Comments Tab */}
-{activeTab === 5 && (
-  <Box>
-    {likedComments.length === 0 ? (
-      <Paper sx={{ p: 4, textAlign: 'center' }}>
-        <ThumbUpIcon sx={{ fontSize: 60, color: 'grey.400', mb: 2 }} />
-        <Typography variant="h6" gutterBottom>
-          No liked comments yet
-        </Typography>
-        <Typography variant="body2" color="text.secondary">
-          Like some comments to see them here!
-        </Typography>
-      </Paper>
-    ) : (
-      <Grid container spacing={3}>
-        {likedComments.map((comment) => (
-          <Grid item xs={12} sm={6} md={4} key={`${comment.imdbId}-${comment.id}`}>
-            <MovieCard 
-              item={comment} 
-              type="comment"
-              additionalInfo={
-                <Typography variant="caption" color="text.secondary">
-                  Liked on: {new Date(comment.likedAt).toLocaleDateString()}
-                </Typography>
-              }
-            />
-          </Grid>
-        ))}
-      </Grid>
-    )}
-  </Box>
-)}
+      {/* Liked Comments Tab */}
+      {activeTab === 5 && (
+        <Box>
+          {likedComments.length === 0 ? (
+            <Paper sx={{ p: 4, textAlign: 'center' }}>
+              <ThumbUpIcon sx={{ fontSize: 60, color: 'grey.400', mb: 2 }} />
+              <Typography variant="h6" gutterBottom>
+                No liked comments yet
+              </Typography>
+              <Typography variant="body2" color="text.secondary">
+                Like some comments to see them here!
+              </Typography>
+            </Paper>
+          ) : (
+            <Grid container spacing={3}>
+              {likedComments.map((comment) => (
+                <Grid item xs={12} sm={6} md={4} key={`${comment.imdbId}-${comment.id}`}>
+                  <CommentCard item={comment} onRemove={deleteComment} likedComment />
+                </Grid>
+              ))}
+            </Grid>
+          )}
+        </Box>
+      )}
 
       {/* Image Preview Dialog */}
       <Dialog open={openImageDialog} onClose={handleCloseImageDialog}>
         <DialogTitle>Profile Picture</DialogTitle>
         <DialogContent>
           <Box sx={{ display: 'flex', justifyContent: 'center' }}>
-            <Avatar 
-              src={imagePreview || user?.image} 
+            <Avatar
+              src={imagePreview || user?.image}
               sx={{ width: 200, height: 200 }}
             />
           </Box>

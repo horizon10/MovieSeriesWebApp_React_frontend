@@ -80,6 +80,7 @@ export const interactionApi = {
   addFavorite: (imdbId) => api.post(`/api/home/favorite/${imdbId}`, ""),
   removeFavorite: (imdbId) => api.delete(`/api/home/favorite/${imdbId}`),
   getFavorites: () => api.get('/api/home/favorite'),
+  getMostFavorited: () => api.get('/api/home/favorite/most-favorited'),
 
   // Yorum işlemleri
   addComment: (imdbId, content) => api.post(`/api/home/comment/${imdbId}`, content, {
@@ -88,7 +89,7 @@ export const interactionApi = {
     }
   }),
   getComments: (imdbId) => api.get(`/api/home/comment/${imdbId}`),
-  getCommentsWithLikes: (imdbId) => api.get(`/api/home/comment/${imdbId}/with-likes`),
+  getCommentsWithLikes: (imdbId) => api.get(`/api/home/comment/${imdbId}/with-likes-and-replies`),
   getUserComments: () => api.get('/api/home/comment/user'),
   deleteComment: (commentId) => api.delete(`/api/home/comment/${commentId}`),
   updateComment: (commentId, newContent) => api.put(`/api/home/comment/${commentId}`, newContent, {

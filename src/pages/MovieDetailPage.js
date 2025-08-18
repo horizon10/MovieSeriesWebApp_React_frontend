@@ -24,6 +24,9 @@ import EditIcon from '@mui/icons-material/Edit';
 import DeleteIcon from '@mui/icons-material/Delete';
 import ThumbUpIcon from '@mui/icons-material/ThumbUp';
 import ThumbUpOutlinedIcon from '@mui/icons-material/ThumbUpOutlined';
+import ReplyIcon from '@mui/icons-material/Reply';
+import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
+import ExpandLessIcon from '@mui/icons-material/ExpandLess';
 
 const MovieDetailPage = () => {
   const { imdbId } = useParams();
@@ -44,6 +47,7 @@ const MovieDetailPage = () => {
   const [userLikedComments, setUserLikedComments] = useState({});
   const [replyingTo, setReplyingTo] = useState(null);
   const [replyContent, setReplyContent] = useState('');
+  const [collapsedComments, setCollapsedComments] = useState(new Set());
 
   useEffect(() => {
     const fetchData = async () => {
@@ -59,7 +63,7 @@ const MovieDetailPage = () => {
           throw new Error('Film bilgileri alınamadı');
         }
 
-        // Yorumları ve beğenileri çek
+        // Yorumları ve beğenileri yanıtlarla birlikte çek - kullanıcı giriş yapmamış olsa bile
         try {
           const commentRes = await interactionApi.getCommentsWithLikes(imdbId);
           console.log('Yorumlar ve beğeniler:', commentRes.data);
@@ -71,10 +75,19 @@ const MovieDetailPage = () => {
           const likesData = {};
           const userLikesData = {};
           
-          commentsData.forEach(comment => {
-            likesData[comment.id] = comment.likeCount || 0;
-            userLikesData[comment.id] = comment.isLikedByCurrentUser || false;
-          });
+          const processComments = (comments) => {
+            comments.forEach(comment => {
+              likesData[comment.id] = comment.likeCount || 0;
+              userLikesData[comment.id] = comment.isLikedByCurrentUser || false;
+              
+              // Yanıtları da işle
+              if (comment.replies && comment.replies.length > 0) {
+                processComments(comment.replies);
+              }
+            });
+          };
+          
+          processComments(commentsData);
           
           setCommentLikes(likesData);
           setUserLikedComments(userLikesData);
@@ -92,13 +105,15 @@ const MovieDetailPage = () => {
           setAverageRating(0);
         }
 
-        // Favori durumunu kontrol et
-        try {
-          const favRes = await interactionApi.getFavorites();
-          setIsFavorite(favRes.data.some(fav => fav.imdbId === imdbId));
-        } catch (err) {
-          console.warn('Favorites fetch error:', err);
-          setIsFavorite(false);
+        // Favori durumunu kontrol et (sadece kullanıcı giriş yaptıysa)
+        if (user) {
+          try {
+            const favRes = await interactionApi.getFavorites();
+            setIsFavorite(favRes.data.some(fav => fav.imdbId === imdbId));
+          } catch (err) {
+            console.warn('Favorites fetch error:', err);
+            setIsFavorite(false);
+          }
         }
 
       } catch (err) {
@@ -109,29 +124,25 @@ const MovieDetailPage = () => {
       }
     };
     
-    if (imdbId && user) {
+    if (imdbId) {  // user kontrolü kaldırıldı
       fetchData();
     }
   }, [imdbId, user]);
 
   const getValidImageUrl = (url) => {
-    if (!url) return null;
-    if (url.startsWith('http') || url.startsWith('/')) {
-      return url;
-    }
-    return `${process.env.REACT_APP_API_BASE_URL}${url}`;
-  };
+  if (!url) return null;
+  if (
+    url.startsWith('http') ||
+    url.startsWith('/') ||
+    url.startsWith('data:image')
+  ) {
+    return url;
+  }
+  return `${process.env.REACT_APP_API_BASE_URL}${url}`;
+};
 
-  const handleAddComment = async () => {
-    if (!newComment.trim()) {
-      setError('Yorum boş olamaz');
-      return;
-    }
-
+  const refreshComments = async () => {
     try {
-      setError(null);
-      await interactionApi.addComment(imdbId, newComment.trim());
-      
       // Yorumları beğenilerle birlikte yenile
       const updated = await interactionApi.getCommentsWithLikes(imdbId);
       const commentsData = updated.data || [];
@@ -141,14 +152,41 @@ const MovieDetailPage = () => {
       const likesData = {};
       const userLikesData = {};
       
-      commentsData.forEach(comment => {
-        likesData[comment.id] = comment.likeCount || 0;
-        userLikesData[comment.id] = comment.isLikedByCurrentUser || false;
-      });
+      const processComments = (comments) => {
+        comments.forEach(comment => {
+          likesData[comment.id] = comment.likeCount || 0;
+          userLikesData[comment.id] = comment.isLikedByCurrentUser || false;
+          
+          if (comment.replies && comment.replies.length > 0) {
+            processComments(comment.replies);
+          }
+        });
+      };
+      
+      processComments(commentsData);
       
       setCommentLikes(likesData);
       setUserLikedComments(userLikesData);
-      
+    } catch (err) {
+      console.error('Refresh comments error:', err);
+    }
+  };
+
+  const handleAddComment = async () => {
+    if (!user) {
+      navigate('/login');
+      return;
+    }
+    
+    if (!newComment.trim()) {
+      setError('Yorum boş olamaz');
+      return;
+    }
+
+    try {
+      setError(null);
+      await interactionApi.addComment(imdbId, newComment.trim());
+      await refreshComments();
       setNewComment('');
       setSuccessMessage('Yorum başarıyla eklendi');
     } catch (err) {
@@ -158,6 +196,11 @@ const MovieDetailPage = () => {
   };
 
   const handleAddReply = async (parentCommentId) => {
+    if (!user) {
+      navigate('/login');
+      return;
+    }
+    
     if (!replyContent.trim()) {
       setError('Yanıt boş olamaz');
       return;
@@ -166,24 +209,7 @@ const MovieDetailPage = () => {
     try {
       setError(null);
       await interactionApi.addReply(parentCommentId, replyContent.trim());
-      
-      // Yorumları yenile
-      const updated = await interactionApi.getCommentsWithLikes(imdbId);
-      const commentsData = updated.data || [];
-      setComments(commentsData);
-      
-      // Beğeni bilgilerini güncelle
-      const likesData = {};
-      const userLikesData = {};
-      
-      commentsData.forEach(comment => {
-        likesData[comment.id] = comment.likeCount || 0;
-        userLikesData[comment.id] = comment.isLikedByCurrentUser || false;
-      });
-      
-      setCommentLikes(likesData);
-      setUserLikedComments(userLikesData);
-      
+      await refreshComments();
       setReplyingTo(null);
       setReplyContent('');
       setSuccessMessage('Yanıt başarıyla eklendi');
@@ -201,23 +227,8 @@ const MovieDetailPage = () => {
 
     try {
       setError(null);
-      
-      await interactionApi.likeComment(commentId); // backend toggle mantığını çalıştırır
-
-      // Güncel beğeni bilgilerini backend'den çek
-      const updated = await interactionApi.getCommentsWithLikes(imdbId);
-      const commentsData = updated.data || [];
-      setComments(commentsData);
-
-      const likesData = {};
-      const userLikesData = {};
-      commentsData.forEach(comment => {
-        likesData[comment.id] = comment.likeCount || 0;
-        userLikesData[comment.id] = comment.isLikedByCurrentUser || false;
-      });
-      setCommentLikes(likesData);
-      setUserLikedComments(userLikesData);
-
+      await interactionApi.likeComment(commentId);
+      await refreshComments();
     } catch (err) {
       console.error('Like comment error:', err);
       setError('Beğeni işlemi sırasında hata oluştu: ' + (err.response?.data || err.message));
@@ -243,24 +254,7 @@ const MovieDetailPage = () => {
     try {
       setError(null);
       await interactionApi.updateComment(editingCommentId, editingCommentContent.trim());
-      
-      // Yorumları beğenilerle birlikte yenile
-      const updated = await interactionApi.getCommentsWithLikes(imdbId);
-      const commentsData = updated.data || [];
-      setComments(commentsData);
-      
-      // Beğeni bilgilerini güncelle
-      const likesData = {};
-      const userLikesData = {};
-      
-      commentsData.forEach(comment => {
-        likesData[comment.id] = comment.likeCount || 0;
-        userLikesData[comment.id] = comment.isLikedByCurrentUser || false;
-      });
-      
-      setCommentLikes(likesData);
-      setUserLikedComments(userLikesData);
-      
+      await refreshComments();
       setEditingCommentId(null);
       setEditingCommentContent('');
       setSuccessMessage('Yorum başarıyla güncellendi');
@@ -274,24 +268,7 @@ const MovieDetailPage = () => {
     try {
       setError(null);
       await interactionApi.deleteComment(commentId);
-      
-      // Yorumları beğenilerle birlikte yenile
-      const updated = await interactionApi.getCommentsWithLikes(imdbId);
-      const commentsData = updated.data || [];
-      setComments(commentsData);
-      
-      // Beğeni bilgilerini güncelle
-      const likesData = {};
-      const userLikesData = {};
-      
-      commentsData.forEach(comment => {
-        likesData[comment.id] = comment.likeCount || 0;
-        userLikesData[comment.id] = comment.isLikedByCurrentUser || false;
-      });
-      
-      setCommentLikes(likesData);
-      setUserLikedComments(userLikesData);
-      
+      await refreshComments();
       setSuccessMessage('Yorum başarıyla silindi');
     } catch (err) {
       console.error('Delete comment error:', err);
@@ -299,7 +276,251 @@ const MovieDetailPage = () => {
     }
   };
 
+  const toggleCollapseComment = (commentId) => {
+    const newCollapsed = new Set(collapsedComments);
+    if (newCollapsed.has(commentId)) {
+      newCollapsed.delete(commentId);
+    } else {
+      newCollapsed.add(commentId);
+    }
+    setCollapsedComments(newCollapsed);
+  };
+
+  // Reddit benzeri yorum render fonksiyonu
+  const renderComment = (comment, depth = 0) => {
+    const isDeleted = comment.content === '[DELETED]' || !comment.content;
+    const isCollapsed = collapsedComments.has(comment.id);
+    const maxDepth = 5;
+    
+    return (
+      <Box key={comment.id} sx={{ 
+        borderLeft: depth > 0 ? '2px solid rgba(255,255,255,0.1)' : 'none',
+        ml: depth * 2,
+        pl: depth > 0 ? 2 : 0
+      }}>
+        {/* Ana yorum satırı */}
+        <Box sx={{ 
+          py: 1,
+          px: 1,
+          '&:hover': {
+            bgcolor: 'rgba(255,255,255,0.02)',
+            borderRadius: 1
+          },
+          transition: 'background-color 0.2s ease'
+        }}>
+          <Box display="flex" alignItems="flex-start" gap={1}>
+            {/* Avatar */}
+            <Avatar 
+  sx={{ width: 28, height: 28, bgcolor: isDeleted ? 'grey.500' : 'primary.main', fontSize: '0.8rem' }}
+  src={!isDeleted && comment.userImage ? getValidImageUrl(comment.userImage) : undefined}
+>
+  {!isDeleted && !comment.userImage && comment.username?.charAt(0)?.toUpperCase()}
+  {isDeleted && '🗑️'}
+</Avatar>
+
+            <Box sx={{ flex: 1, minWidth: 0 }}>
+              {/* Kullanıcı bilgileri ve collapse butonu */}
+              <Box display="flex" alignItems="center" gap={1} sx={{ mb: 0.5 }}>
+                <Typography 
+                  variant="body2" 
+                  sx={{ 
+                    fontWeight: 'bold',
+                    color: isDeleted ? 'grey.500' : 'text.primary',
+                    fontSize: '0.85rem'
+                  }}
+                >
+                  {isDeleted ? '[deleted]' : (comment.username || 'Anonim')}
+                </Typography>
+                
+                <Typography variant="caption" color="text.secondary" sx={{ fontSize: '0.75rem' }}>
+                  {comment.createdAt ? new Date(comment.createdAt).toLocaleString('tr-TR', {
+                    hour: '2-digit',
+                    minute: '2-digit',
+                    day: '2-digit',
+                    month: '2-digit'
+                  }) : 'şimdi'}
+                </Typography>
+
+                {comment.replies && comment.replies.length > 0 && (
+                  <IconButton 
+                    size="small"
+                    onClick={() => toggleCollapseComment(comment.id)}
+                    sx={{ p: 0.5 }}
+                  >
+                    {isCollapsed ? <ExpandMoreIcon fontSize="small" /> : <ExpandLessIcon fontSize="small" />}
+                  </IconButton>
+                )}
+              </Box>
+
+              {/* Yorum içeriği */}
+              {!isCollapsed && (
+                <>
+                  {editingCommentId === comment.id ? (
+                    <Box sx={{ mb: 1 }}>
+                      <TextField
+                        fullWidth
+                        variant="outlined"
+                        size="small"
+                        value={editingCommentContent}
+                        onChange={(e) => setEditingCommentContent(e.target.value)}
+                        multiline
+                        rows={2}
+                        sx={{ mb: 1 }}
+                      />
+                      <Box display="flex" gap={1}>
+                        <Button size="small" variant="contained" onClick={handleUpdateComment}>
+                          Kaydet
+                        </Button>
+                        <Button size="small" variant="outlined" onClick={cancelEditing}>
+                          İptal
+                        </Button>
+                      </Box>
+                    </Box>
+                  ) : (
+                    <Typography 
+                      variant="body2" 
+                      sx={{ 
+                        mb: 1,
+                        color: isDeleted ? 'grey.500' : 'text.primary',
+                        fontStyle: isDeleted ? 'italic' : 'normal',
+                        lineHeight: 1.4
+                      }}
+                    >
+                      {isDeleted ? 'Bu yorum silinmiştir' : comment.content}
+                    </Typography>
+                  )}
+
+                  {/* Aksiyon butonları */}
+                  {!isDeleted && (
+                    <Box display="flex" alignItems="center" gap={1}>
+                      {/* Beğeni */}
+                      <Box display="flex" alignItems="center">
+                        <IconButton 
+                          size="small"
+                          onClick={() => handleLikeComment(comment.id)}
+                          color={userLikedComments[comment.id] ? 'primary' : 'default'}
+                          sx={{ p: 0.5 }}
+                        >
+                          {userLikedComments[comment.id] ? (
+                            <ThumbUpIcon sx={{ fontSize: 16 }} />
+                          ) : (
+                            <ThumbUpOutlinedIcon sx={{ fontSize: 16 }} />
+                          )}
+                        </IconButton>
+                        <Typography variant="caption" sx={{ fontSize: '0.75rem' }}>
+                          {commentLikes[comment.id] || 0}
+                        </Typography>
+                      </Box>
+
+                      {/* Yanıtla */}
+                      {depth < maxDepth && (
+                        <Button 
+                          size="small" 
+                          onClick={() => setReplyingTo(replyingTo === comment.id ? null : comment.id)}
+                          sx={{ 
+                            minWidth: 'auto',
+                            p: 0.5,
+                            fontSize: '0.75rem',
+                            textTransform: 'none',
+                            color: replyingTo === comment.id ? 'primary.main' : 'text.secondary'
+                          }}
+                        >
+                          yanıtla
+                        </Button>
+                      )}
+
+                      {/* Düzenle/Sil - sadece kendi yorumları için */}
+                      {user && comment.userId === user.id && (
+                        <>
+                          <Button 
+                            size="small"
+                            onClick={() => startEditingComment(comment.id, comment.content)}
+                            sx={{ 
+                              minWidth: 'auto',
+                              p: 0.5,
+                              fontSize: '0.75rem',
+                              textTransform: 'none',
+                              color: 'text.secondary'
+                            }}
+                          >
+                            düzenle
+                          </Button>
+                          <Button 
+                            size="small"
+                            onClick={() => handleDeleteComment(comment.id)}
+                            sx={{ 
+                              minWidth: 'auto',
+                              p: 0.5,
+                              fontSize: '0.75rem',
+                              textTransform: 'none',
+                              color: 'error.main'
+                            }}
+                          >
+                            sil
+                          </Button>
+                        </>
+                      )}
+                    </Box>
+                  )}
+
+                  {/* Yanıt formu */}
+                  {replyingTo === comment.id && depth < maxDepth && (
+                    <Box sx={{ mt: 1, mb: 1 }}>
+                      <TextField
+                        fullWidth
+                        variant="outlined"
+                        size="small"
+                        placeholder="Yanıtınızı yazın..."
+                        value={replyContent}
+                        onChange={(e) => setReplyContent(e.target.value)}
+                        multiline
+                        rows={2}
+                        sx={{ mb: 1 }}
+                      />
+                      <Box display="flex" gap={1}>
+                        <Button 
+                          size="small" 
+                          variant="contained"
+                          onClick={() => handleAddReply(comment.id)}
+                          disabled={!replyContent.trim()}
+                        >
+                          Yanıtla
+                        </Button>
+                        <Button 
+                          size="small" 
+                          variant="outlined"
+                          onClick={() => {
+                            setReplyingTo(null);
+                            setReplyContent('');
+                          }}
+                        >
+                          İptal
+                        </Button>
+                      </Box>
+                    </Box>
+                  )}
+                </>
+              )}
+            </Box>
+          </Box>
+        </Box>
+
+        {/* Yanıtlar */}
+        {!isCollapsed && comment.replies && comment.replies.length > 0 && (
+          <Box sx={{ mt: 0.5 }}>
+            {comment.replies.map(reply => renderComment(reply, depth + 1))}
+          </Box>
+        )}
+      </Box>
+    );
+  };
+
   const handleRateMovie = async () => {
+    if (!user) {
+      navigate('/login');
+      return;
+    }
+    
     if (userRating === 0) {
       setError('Lütfen bir puan seçin');
       return;
@@ -320,6 +541,11 @@ const MovieDetailPage = () => {
   };
 
   const toggleFavorite = async () => {
+    if (!user) {
+      navigate('/login');
+      return;
+    }
+    
     try {
       setError(null);
       if (isFavorite) {
@@ -488,7 +714,7 @@ const MovieDetailPage = () => {
                     </Typography>
                   </Box>
                   <IconButton 
-                    onClick={user ? toggleFavorite : () => navigate('/login')} 
+                    onClick={toggleFavorite} 
                     size="large"
                     sx={{
                       background: isFavorite ? 'rgba(244, 67, 54, 0.1)' : 'rgba(0,0,0,0.05)',
@@ -555,8 +781,8 @@ const MovieDetailPage = () => {
                       </Typography>
                       <Box display="flex" alignItems="center" gap={1}>
                         <Rating
-                          value={userRating}
-                          onChange={(e, val) => user ? setUserRating(val || 0) : navigate('/login')}
+                          value={averageRating}
+                          readOnly
                           size="large"
                         />
                         <Typography variant="h6" color="primary">
@@ -569,18 +795,19 @@ const MovieDetailPage = () => {
                   <Grid item xs={12} sm={6}>
                     <Paper sx={{ p: 2, borderRadius: 2, background: 'rgba(76, 175, 80, 0.05)' }}>
                       <Typography variant="subtitle1" sx={{ mb: 1, fontWeight: 'bold' }}>
-                        Puanınız
+                        {user ? 'Puanınız' : 'Puan vermek için giriş yapın'}
                       </Typography>
                       <Box display="flex" alignItems="center" gap={2}>
                         <Rating
                           value={userRating}
                           onChange={(e, val) => setUserRating(val || 0)}
                           size="large"
+                          disabled={!user}
                         />
                         <Button 
                           onClick={handleRateMovie} 
                           variant="contained"
-                          disabled={userRating === 0}
+                          disabled={userRating === 0 || !user}
                           sx={{ borderRadius: 2 }}
                         >
                           Oyla
@@ -609,7 +836,7 @@ const MovieDetailPage = () => {
                 <Grid container spacing={2}>
                   {[
                     { label: 'Yönetmen', value: movie.Director, icon: '🎬' },
-                    { label: 'Senaryo', value: movie.Writer, icon: '✍️' },
+                    { label: 'Senaryo', value: movie.Writer, icon: '✏️' },
                     { label: 'Oyuncular', value: movie.Actors, icon: '🎭' },
                     { label: 'Tür', value: movie.Genre, icon: '🎪' },
                     { label: 'Dil', value: movie.Language, icon: '🌍' },
@@ -650,12 +877,12 @@ const MovieDetailPage = () => {
           </Grid>
         </Fade>
 
-        {/* Yorumlar Bölümü */}
+        {/* Yorumlar Bölümü - Reddit Tarzı */}
         <Fade in timeout={1200}>
           <Paper 
             sx={{ 
               mt: 4, 
-              p: 4, 
+              p: 3, 
               borderRadius: 4,
               background: 'rgba(30, 30, 30, 0.95)',
               backdropFilter: 'blur(10px)'
@@ -668,497 +895,115 @@ const MovieDetailPage = () => {
             </Typography>
 
             {/* Yorum Ekleme */}
-            {user ? (
-              <Paper sx={{ p: 3, mb: 3, background: 'rgba(25, 118, 210, 0.05)' }} elevation={2}>
-                <TextField
-                  fullWidth
-                  variant="outlined"
-                  label="Yorumunuzu yazın..."
-                  value={newComment}
-                  onChange={(e) => setNewComment(e.target.value)}
-                  multiline
-                  rows={3}
-                  sx={{ mb: 2 }}
-                  onKeyPress={(e) => {
-                    if (e.key === 'Enter' && e.ctrlKey) {
-                      handleAddComment();
-                    }
-                  }}
-                />
-                <Box display="flex" justifyContent="space-between" alignItems="center">
-                  <Typography variant="caption" color="text.secondary">
-                    Ctrl + Enter ile gönder
-                  </Typography>
-                  <Button 
-                    variant="contained" 
-                    onClick={handleAddComment}
-                    disabled={!newComment.trim()}
-                    sx={{ borderRadius: 2, px: 3 }}
-                  >
-                    Yorum Yap
-                  </Button>
-                </Box>
-              </Paper>
-            ) : (
-              <Paper sx={{ p: 3, mb: 3, textAlign: 'center' }}>
-                <Button 
-                  variant="outlined" 
-                  onClick={() => navigate('/login')}
-                  startIcon={<CommentIcon />}
-                >
-                  Yorum yapmak için giriş yapın
-                </Button>
-              </Paper>
-            )}
-
-            {/* Yorumlar Listesi */}
-{comments.length > 0 ? (
-  <List sx={{ maxHeight: 600, overflow: 'auto' }}>
-    {comments.map((comment, index) => (
-      <Box key={comment.id || index}>
-        <ListItem 
-          alignItems="flex-start"
-          sx={{
-            borderRadius: 3,
-            mb: 2,
-            background: 'rgba(255,255,255,0.02)',
-            border: '1px solid rgba(255,255,255,0.1)',
-            transition: 'all 0.3s ease',
-            '&:hover': {
-              background: 'rgba(25, 118, 210, 0.05)',
-              transform: 'translateY(-1px)',
-              boxShadow: '0 4px 20px rgba(0,0,0,0.1)'
-            }
-          }}
-        >
-          <Avatar 
-            sx={{ 
-              mr: 2, 
-              mt: 0.5, 
-              bgcolor: 'primary.main',
-              width: 45,
-              height: 45,
-              border: '2px solid rgba(25, 118, 210, 0.3)'
-            }}
-            src={comment.userImage ? getValidImageUrl(comment.userImage) : undefined}
-          >
-            {!comment.userImage && <PersonIcon />}
-          </Avatar>
-          
-          {editingCommentId === comment.id ? (
-            <Box sx={{ width: '100%' }}>
-              <TextField
-                fullWidth
-                variant="outlined"
-                value={editingCommentContent}
-                onChange={(e) => setEditingCommentContent(e.target.value)}
-                multiline
-                rows={3}
-                sx={{ 
-                  mb: 2,
-                  '& .MuiOutlinedInput-root': {
-                    borderRadius: 2
-                  }
-                }}
-              />
-              <Box display="flex" justifyContent="flex-end" gap={1}>
-                <Button 
-                  variant="outlined" 
-                  onClick={cancelEditing}
-                  sx={{ borderRadius: 2 }}
-                >
-                  İptal
-                </Button>
-                <Button 
-                  variant="contained" 
-                  onClick={handleUpdateComment}
-                  disabled={!editingCommentContent.trim()}
-                  sx={{ borderRadius: 2 }}
-                >
-                  Güncelle
-                </Button>
-              </Box>
-            </Box>
-          ) : (
-            <Box sx={{ width: '100%' }}>
-              <Box display="flex" justifyContent="space-between" alignItems="flex-start">
-                <ListItemText
-                  primary={
-                    <Box display="flex" alignItems="center" gap={1} sx={{ mb: 1 }}>
-                      <Typography variant="subtitle1" sx={{ 
-                        fontWeight: 'bold', 
-                        color: 'primary.main',
-                        fontSize: '1.1rem'
-                      }}>
-                        {comment.username || 'Anonim Kullanıcı'}
-                      </Typography>
-                      <Chip 
-                        label="Yorum" 
-                        size="small" 
-                        sx={{ 
-                          height: 20, 
-                          fontSize: '0.7rem',
-                          bgcolor: 'primary.main',
-                          color: 'white'
-                        }} 
-                      />
-                    </Box>
-                  }
-                  secondary={
-                    <Box>
-                      <Paper
-                        sx={{
-                          p: 2,
-                          mt: 1,
-                          mb: 2,
-                          background: 'rgba(255,255,255,0.03)',
-                          borderRadius: 2,
-                          border: '1px solid rgba(255,255,255,0.05)'
+            <Box sx={{ mb: 3 }}>
+              {user ? (
+                <Box sx={{ 
+                  p: 2, 
+                  borderRadius: 2,
+                  border: '1px solid rgba(255,255,255,0.1)',
+                  background: 'rgba(25, 118, 210, 0.02)'
+                }}>
+                  <Box display="flex" gap={2} alignItems="flex-start">
+                    <Avatar 
+                      sx={{ 
+                        width: 32, 
+                        height: 32,
+                        bgcolor: 'primary.main'
+                      }}
+                      src={user.image ? getValidImageUrl(user.image) : undefined}
+                    >
+                      {!user.image && user.username?.charAt(0)?.toUpperCase()}
+                    </Avatar>
+                    <Box sx={{ flex: 1 }}>
+                      <TextField
+                        fullWidth
+                        variant="outlined"
+                        placeholder="Yorumunuzu yazın..."
+                        value={newComment}
+                        onChange={(e) => setNewComment(e.target.value)}
+                        multiline
+                        rows={3}
+                        size="small"
+                        sx={{ mb: 1 }}
+                        onKeyPress={(e) => {
+                          if (e.key === 'Enter' && e.ctrlKey) {
+                            handleAddComment();
+                          }
                         }}
-                      >
-                        <Typography
-                          variant="body1"
-                          component="div"
-                          sx={{ 
-                            color: 'text.primary',
-                            lineHeight: 1.6,
-                            fontSize: '0.95rem'
-                          }}
-                        >
-                          {comment.content}
+                      />
+                      <Box display="flex" justifyContent="space-between" alignItems="center">
+                        <Typography variant="caption" color="text.secondary">
+                          Ctrl + Enter ile gönder
                         </Typography>
-                      </Paper>
-                      
-                      <Box display="flex" alignItems="center" justifyContent="space-between" sx={{ mt: 1 }}>
-                        <Typography 
-                          variant="caption" 
-                          component="div" 
-                          color="text.secondary"
-                          sx={{ fontSize: '0.75rem' }}
+                        <Button 
+                          variant="contained" 
+                          size="small"
+                          onClick={handleAddComment}
+                          disabled={!newComment.trim()}
+                          sx={{ borderRadius: 2 }}
                         >
-                          {comment.createdAt ? new Date(comment.createdAt).toLocaleString('tr-TR') : 'Şimdi'}
-                        </Typography>
-                        
-                        <Box display="flex" alignItems="center" gap={1}>
-                          {/* Beğeni butonu ve sayacı */}
-                          <Box 
-                            display="flex" 
-                            alignItems="center"
-                            sx={{
-                              bgcolor: userLikedComments[comment.id] ? 'rgba(25, 118, 210, 0.1)' : 'rgba(0,0,0,0.05)',
-                              borderRadius: 2,
-                              px: 1,
-                              py: 0.5
-                            }}
-                          >
-                            <IconButton 
-                              onClick={() => handleLikeComment(comment.id)} 
-                              size="small"
-                              color={userLikedComments[comment.id] ? 'primary' : 'default'}
-                              sx={{ p: 0.5 }}
-                            >
-                              {userLikedComments[comment.id] ? (
-                                <ThumbUpIcon fontSize="small" />
-                              ) : (
-                                <ThumbUpOutlinedIcon fontSize="small" />
-                              )}
-                            </IconButton>
-                            <Typography variant="caption" sx={{ ml: 0.5, fontWeight: 'bold' }}>
-                              {commentLikes[comment.id] || 0}
-                            </Typography>
-                          </Box>
-                          
-                          {/* Yanıt butonu */}
-                          <Button 
-                            size="small" 
-                            startIcon={<CommentIcon fontSize="small" />}
-                            onClick={() => setReplyingTo(replyingTo === comment.id ? null : comment.id)}
-                            sx={{
-                              borderRadius: 2,
-                              bgcolor: replyingTo === comment.id ? 'rgba(25, 118, 210, 0.1)' : 'transparent',
-                              '&:hover': {
-                                bgcolor: 'rgba(25, 118, 210, 0.15)'
-                              }
-                            }}
-                          >
-                            Yanıtla
-                          </Button>
-                        </Box>
+                          Yorum Yap
+                        </Button>
                       </Box>
                     </Box>
-                  }
-                  secondaryTypographyProps={{ component: "div" }}
-                />
-                
-                {/* Yalnızca kendi yorumlarını düzenleyebilir */}
-                {user && comment.userId === user.id && (
-                  <Box sx={{ display: 'flex', gap: 0.5 }}>
-                    <IconButton 
-                      onClick={() => startEditingComment(comment.id, comment.content)} 
-                      size="small" 
-                      sx={{ 
-                        bgcolor: 'rgba(0,0,0,0.05)',
-                        '&:hover': { bgcolor: 'rgba(25, 118, 210, 0.1)' }
-                      }}
-                    >
-                      <EditIcon fontSize="small" />
-                    </IconButton>
-                    <IconButton 
-                      onClick={() => handleDeleteComment(comment.id)} 
-                      size="small"
-                      sx={{ 
-                        bgcolor: 'rgba(0,0,0,0.05)',
-                        '&:hover': { bgcolor: 'rgba(244, 67, 54, 0.1)' }
-                      }}
-                    >
-                      <DeleteIcon fontSize="small" />
-                    </IconButton>
                   </Box>
-                )}
-              </Box>
-              
-              {/* Yanıt formu */}
-              {/* Yanıt formu */}
-{replyingTo === comment.id && (
-  <Fade in timeout={300}>
-    <Box sx={{ 
-      mt: 2,
-      ml: 4,
-      position: 'relative',
-      '&:before': {
-        content: '""',
-        position: 'absolute',
-        left: -24,
-        top: 0,
-        bottom: 0,
-        width: 2,
-        backgroundColor: 'rgba(25, 118, 210, 0.2)',
-        borderRadius: 2
-      }
-    }}>
-      <Paper
-        sx={{ 
-          p: 2,
-          borderRadius: 2,
-          background: 'rgba(25, 118, 210, 0.03)',
-          borderLeft: '3px solid',
-          borderColor: 'primary.main'
-        }}
-      >
-        <Box display="flex" alignItems="center" gap={1} sx={{ mb: 2 }}>
-          <CommentIcon fontSize="small" color="primary" />
-          <Typography variant="subtitle2" color="primary" sx={{ fontWeight: 'bold' }}>
-            {comment.username} kullanıcısına yanıt yazıyorsunuz
-          </Typography>
-        </Box>
-        <TextField
-          fullWidth
-          variant="outlined"
-          label="Yanıtınızı yazın..."
-          value={replyContent}
-          onChange={(e) => setReplyContent(e.target.value)}
-          multiline
-          rows={2}
-          sx={{ 
-            mb: 2,
-            '& .MuiOutlinedInput-root': {
-              borderRadius: 1,
-              background: 'rgba(255,255,255,0.9)'
-            }
-          }}
-        />
-        <Box display="flex" justifyContent="flex-end" gap={1}>
-          <Button 
-            variant="outlined" 
-            size="small"
-            onClick={() => {
-              setReplyingTo(null);
-              setReplyContent('');
-            }}
-            sx={{ borderRadius: 1 }}
-          >
-            İptal
-          </Button>
-          <Button 
-            variant="contained" 
-            size="small"
-            onClick={() => handleAddReply(comment.id)}
-            disabled={!replyContent.trim()}
-            sx={{ borderRadius: 1 }}
-          >
-            Gönder
-          </Button>
-        </Box>
-      </Paper>
-    </Box>
-  </Fade>
-)}
-              
-              {/* Yanıtlar */}
-{comment.replies && comment.replies.length > 0 && (
-  <Box sx={{ 
-    mt: 2,
-    ml: 4, // Ana yanıt kutusunu biraz içeri kaydır
-    position: 'relative',
-    '&:before': {
-      content: '""',
-      position: 'absolute',
-      left: -24,
-      top: 0,
-      bottom: 0,
-      width: 2,
-      backgroundColor: 'rgba(25, 118, 210, 0.2)',
-      borderRadius: 2
-    }
-  }}>
-    {comment.replies.map((reply, replyIndex) => (
-      <Paper
-        key={reply.id}
-        sx={{
-          mb: 2,
-          p: 2,
-          borderRadius: 2,
-          background: 'rgba(25, 118, 210, 0.03)',
-          borderLeft: '3px solid',
-          borderColor: 'primary.main',
-          position: 'relative',
-          transition: 'all 0.3s ease',
-          '&:hover': {
-            transform: 'translateY(-2px)',
-            boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
-            background: 'rgba(25, 118, 210, 0.05)'
-          }
-        }}
-      >
-        {/* Yanıt bağlantı çizgisi için nokta */}
-        <Box
-          sx={{
-            position: 'absolute',
-            left: -27,
-            top: 20,
-            width: 8,
-            height: 8,
-            borderRadius: '50%',
-            backgroundColor: 'primary.main'
-          }}
-        />
-        
-        <Box display="flex" alignItems="flex-start" gap={2}>
-          <Avatar 
-            sx={{ 
-              width: 32, 
-              height: 32,
-              bgcolor: 'primary.main',
-              color: 'white',
-              fontSize: '0.8rem',
-              border: '2px solid rgba(25, 118, 210, 0.3)'
-            }} 
-            src={reply.userImage ? getValidImageUrl(reply.userImage) : undefined}
-          >
-            {!reply.userImage && reply.username?.charAt(0).toUpperCase()}
-          </Avatar>
-          <Box sx={{ flex: 1 }}>
-            <Box display="flex" alignItems="center" gap={1} sx={{ mb: 1 }}>
-              <Typography variant="subtitle2" sx={{ fontWeight: 'bold' }}>
-                {reply.username}
-              </Typography>
-              <Chip 
-                label="Yanıt" 
-                size="small" 
-                sx={{ 
-                  height: 18, 
-                  fontSize: '0.65rem',
-                  bgcolor: 'primary.main',
-                  color: 'white'
-                }} 
-              />
-              <Typography 
-                variant="caption" 
-                color="text.secondary" 
-                sx={{ ml: 'auto' }}
-              >
-                {new Date(reply.createdAt).toLocaleString('tr-TR')}
-              </Typography>
+                </Box>
+              ) : (
+                <Box sx={{ 
+                  p: 3, 
+                  textAlign: 'center',
+                  border: '1px dashed rgba(255,255,255,0.2)',
+                  borderRadius: 2
+                }}>
+                  <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+                    Yorum yapmak ve beğenmek için giriş yapın
+                  </Typography>
+                  <Button 
+                    variant="outlined" 
+                    onClick={() => navigate('/login')}
+                    startIcon={<CommentIcon />}
+                  >
+                    Giriş Yap
+                  </Button>
+                </Box>
+              )}
             </Box>
-            <Typography variant="body2" sx={{ 
-              lineHeight: 1.6,
-              color: 'text.primary'
-            }}>
-              {reply.content}
-            </Typography>
-            
-            {/* Yanıt beğeni butonu */}
-            <Box display="flex" justifyContent="flex-end" sx={{ mt: 1 }}>
+
+            {/* Yorumlar Listesi - Reddit Tarzı */}
+            {comments.length > 0 ? (
+              <Box>
+                {comments.map((comment, index) => (
+                  <Box key={comment.id || index}>
+                    {renderComment(comment)}
+                    {index < comments.length - 1 && (
+                      <Divider 
+                        sx={{ 
+                          my: 1, 
+                          bgcolor: 'rgba(255,255,255,0.05)'
+                        }} 
+                      />
+                    )}
+                  </Box>
+                ))}
+              </Box>
+            ) : (
               <Box 
-                display="flex" 
-                alignItems="center"
-                sx={{
-                  bgcolor: userLikedComments[reply.id] ? 'rgba(25, 118, 210, 0.1)' : 'rgba(0,0,0,0.05)',
-                  borderRadius: 2,
-                  px: 1,
-                  py: 0.5
+                sx={{ 
+                  p: 4, 
+                  textAlign: 'center',
+                  border: '1px dashed rgba(255,255,255,0.2)',
+                  borderRadius: 2
                 }}
               >
-                <IconButton 
-                  onClick={() => handleLikeComment(reply.id)} 
-                  size="small"
-                  color={userLikedComments[reply.id] ? 'primary' : 'default'}
-                  sx={{ p: 0.5 }}
-                >
-                  {userLikedComments[reply.id] ? (
-                    <ThumbUpIcon fontSize="small" />
-                  ) : (
-                    <ThumbUpOutlinedIcon fontSize="small" />
-                  )}
-                </IconButton>
-                <Typography variant="caption" sx={{ ml: 0.5, fontWeight: 'bold' }}>
-                  {commentLikes[reply.id] || 0}
+                <CommentIcon sx={{ fontSize: 48, color: 'text.secondary', mb: 2, opacity: 0.5 }} />
+                <Typography variant="h6" color="text.secondary" sx={{ mb: 1 }}>
+                  Henüz yorum yapılmamış
+                </Typography>
+                <Typography variant="body2" color="text.secondary">
+                  İlk yorumu yapan siz olun!
                 </Typography>
               </Box>
-            </Box>
-          </Box>
-        </Box>
-      </Paper>
-    ))}
-  </Box>
-)}
-            </Box>
-          )}
-        </ListItem>
-        {index < comments.length - 1 && (
-          <Divider 
-            sx={{ 
-              my: 2, 
-              bgcolor: 'rgba(255,255,255,0.1)',
-              height: 2,
-              borderRadius: 1
-            }} 
-          />
-        )}
-      </Box>
-    ))}
-  </List>
-) : (
-  <Paper 
-    sx={{ 
-      p: 4, 
-      textAlign: 'center',
-      background: 'rgba(0,0,0,0.02)',
-      borderStyle: 'dashed',
-      borderWidth: 2,
-      borderColor: 'divider',
-      borderRadius: 3
-    }}
-  >
-    <CommentIcon sx={{ fontSize: 48, color: 'text.secondary', mb: 2 }} />
-    <Typography variant="h6" color="text.secondary">
-      Henüz yorum yapılmamış
-    </Typography>
-    <Typography variant="body2" color="text.secondary">
-      İlk yorumu yapan siz olun!
-    </Typography>
-  </Paper>
-)}
+            )}
 
           </Paper>
         </Fade>
