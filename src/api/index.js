@@ -147,7 +147,20 @@ export const adminApi = {
   // Contact message management
   getAllContactMessages: () => api.get('/api/admin/contact'),
   deleteContactMessage: (id) => api.delete(`/api/admin/contact/${id}`),
-  sendContactMessage: (message) => api.post('/api/home/contact', message)
+  sendContactMessage: (message) => api.post('/api/home/contact', message),
+   // İstatistik endpoint'i
+  getStatistics: () => api.get('/api/admin/statistics'),
+
+  getAllUsers: () => api.get('/api/admin/users'),
+  deleteUser: (id) => api.delete(`/api/admin/users/${id}`),
+  updateUserRole: (userId, role) => api.put(`/api/admin/users/${userId}/role`, { role }),
+
+  getAllComments: () => api.get('/api/admin/comments'),
+  deleteComment: (id) => api.delete(`/api/admin/comments/${id}`),
+
+  getAllContactMessages: () => api.get('/api/admin/contact'),
+  deleteContactMessage: (id) => api.delete(`/api/admin/contact/${id}`)
+
 };
 
 export const moderatorApi = {

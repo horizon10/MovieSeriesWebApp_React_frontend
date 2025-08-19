@@ -1,3 +1,4 @@
+// src/components/MovieDetailPage.js
 import { useState, useEffect } from 'react';
 import { omdbApiId, interactionApi } from '../api';
 import {
@@ -27,9 +28,11 @@ import ThumbUpOutlinedIcon from '@mui/icons-material/ThumbUpOutlined';
 import ReplyIcon from '@mui/icons-material/Reply';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import ExpandLessIcon from '@mui/icons-material/ExpandLess';
+import { useTheme } from '../context/ThemeContext'; // useTheme import edildi
 
 const MovieDetailPage = () => {
   const { imdbId } = useParams();
+  const { darkMode } = useTheme(); // darkMode durumu ThemeContext'ten alınıyor
   const [movie, setMovie] = useState(null);
   const [comments, setComments] = useState([]);
   const [newComment, setNewComment] = useState('');
@@ -111,8 +114,8 @@ const MovieDetailPage = () => {
             const favRes = await interactionApi.getFavorites();
             setIsFavorite(favRes.data.some(fav => fav.imdbId === imdbId));
           } catch (err) {
-            console.warn('Favorites fetch error:', err);
-            setIsFavorite(false);
+          console.warn('Favorites fetch error:', err);
+          setIsFavorite(false);
           }
         }
 
@@ -139,7 +142,7 @@ const MovieDetailPage = () => {
     return url;
   }
   return `${process.env.REACT_APP_API_BASE_URL}${url}`;
-};
+  };
 
   const refreshComments = async () => {
     try {
@@ -303,7 +306,7 @@ const MovieDetailPage = () => {
           py: 1,
           px: 1,
           '&:hover': {
-            bgcolor: 'rgba(255,255,255,0.02)',
+            bgcolor: darkMode ? 'rgba(255,255,255,0.02)' : 'rgba(0,0,0,0.02)',
             borderRadius: 1
           },
           transition: 'background-color 0.2s ease'
@@ -311,12 +314,12 @@ const MovieDetailPage = () => {
           <Box display="flex" alignItems="flex-start" gap={1}>
             {/* Avatar */}
             <Avatar 
-  sx={{ width: 28, height: 28, bgcolor: isDeleted ? 'grey.500' : 'primary.main', fontSize: '0.8rem' }}
-  src={!isDeleted && comment.userImage ? getValidImageUrl(comment.userImage) : undefined}
->
-  {!isDeleted && !comment.userImage && comment.username?.charAt(0)?.toUpperCase()}
-  {isDeleted && '🗑️'}
-</Avatar>
+              sx={{ width: 28, height: 28, bgcolor: isDeleted ? 'grey.500' : 'primary.main', fontSize: '0.8rem' }}
+              src={!isDeleted && comment.userImage ? getValidImageUrl(comment.userImage) : undefined}
+            >
+              {!isDeleted && !comment.userImage && comment.username?.charAt(0)?.toUpperCase()}
+              {isDeleted && '🗑️'}
+            </Avatar>
 
             <Box sx={{ flex: 1, minWidth: 0 }}>
               {/* Kullanıcı bilgileri ve collapse butonu */}
@@ -598,10 +601,12 @@ const MovieDetailPage = () => {
   return (
     <Box sx={{ 
       minHeight: '100vh',
-      background: 'linear-gradient(135deg, #1a1a1a 0%, #2d2d2d 100%)',
+      background: darkMode 
+        ? 'linear-gradient(135deg, #1a1a1a 0%, #2d2d2d 100%)' 
+        : 'linear-gradient(135deg, #f0f0f0 0%, #ffffff 100%)',
       pb: 4,
       position: 'relative',
-      color: '#ffffff'
+      color: darkMode ? '#ffffff' : '#000000'
     }}>
       {/* Backdrop Image */}
       <Box
@@ -614,7 +619,7 @@ const MovieDetailPage = () => {
           backgroundImage: movie.Poster !== 'N/A' ? `url(${movie.Poster})` : 'none',
           backgroundSize: 'cover',
           backgroundPosition: 'center',
-          opacity: 0.1,
+          opacity: darkMode ? 0.1 : 0.05,
           zIndex: 0
         }}
       />
@@ -656,11 +661,11 @@ const MovieDetailPage = () => {
             {/* Film Posteri */}
             <Grid item xs={12} md={4}>
               <Paper 
-                elevation={20}
+                elevation={darkMode ? 20 : 10}
                 sx={{ 
                   borderRadius: 4,
                   overflow: 'hidden',
-                  background: 'rgba(255,255,255,0.95)',
+                  background: darkMode ? 'rgba(255,255,255,0.95)' : 'rgba(255,255,255,0.95)',
                   backdropFilter: 'blur(10px)',
                   transition: 'transform 0.3s ease',
                   '&:hover': {
@@ -686,7 +691,7 @@ const MovieDetailPage = () => {
                 sx={{ 
                   p: 4, 
                   borderRadius: 4,
-                  background: 'rgba(30, 30, 30, 0.95)',
+                  background: darkMode ? 'rgba(30, 30, 30, 0.95)' : 'rgba(255, 255, 255, 0.95)',
                   backdropFilter: 'blur(10px)',
                   mb: 3
                 }}
@@ -700,7 +705,9 @@ const MovieDetailPage = () => {
                       component="h1" 
                       sx={{ 
                         fontWeight: 'bold',
-                        background: 'linear-gradient(45deg, #1976d2, #42a5f5)',
+                        background: darkMode 
+                          ? 'linear-gradient(45deg, #1976d2, #42a5f5)'
+                          : 'linear-gradient(45deg, #1565c0, #42a5f5)',
                         backgroundClip: 'text',
                         WebkitBackgroundClip: 'text',
                         WebkitTextFillColor: 'transparent',
@@ -717,9 +724,13 @@ const MovieDetailPage = () => {
                     onClick={toggleFavorite} 
                     size="large"
                     sx={{
-                      background: isFavorite ? 'rgba(244, 67, 54, 0.1)' : 'rgba(0,0,0,0.05)',
+                      background: isFavorite 
+                        ? (darkMode ? 'rgba(244, 67, 54, 0.2)' : 'rgba(244, 67, 54, 0.1)') 
+                        : (darkMode ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.05)'),
                       '&:hover': {
-                        background: isFavorite ? 'rgba(244, 67, 54, 0.2)' : 'rgba(0,0,0,0.1)',
+                        background: isFavorite 
+                          ? (darkMode ? 'rgba(244, 67, 54, 0.3)' : 'rgba(244, 67, 54, 0.2)')
+                          : (darkMode ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.1)'),
                         transform: 'scale(1.1)'
                       },
                       transition: 'all 0.2s ease'
@@ -728,7 +739,7 @@ const MovieDetailPage = () => {
                     {isFavorite ? (
                       <FavoriteIcon sx={{ color: '#f44336', fontSize: 32 }} />
                     ) : (
-                      <FavoriteBorderIcon sx={{ fontSize: 32 }} />
+                      <FavoriteBorderIcon sx={{ fontSize: 32, color: darkMode ? 'inherit' : 'primary.main' }} />
                     )}
                   </IconButton>
                 </Box>
@@ -774,7 +785,7 @@ const MovieDetailPage = () => {
                 {/* Puanlama Bölümü */}
                 <Grid container spacing={3} sx={{ mb: 3 }}>
                   <Grid item xs={12} sm={6}>
-                    <Paper sx={{ p: 2, borderRadius: 2, background: 'rgba(25, 118, 210, 0.05)' }}>
+                    <Paper sx={{ p: 2, borderRadius: 2, background: darkMode ? 'rgba(25, 118, 210, 0.05)' : 'rgba(25, 118, 210, 0.08)' }}>
                       <Typography variant="subtitle1" sx={{ mb: 1, fontWeight: 'bold' }}>
                         <StarIcon sx={{ mr: 1, verticalAlign: 'middle' }} />
                         Ortalama Puan
@@ -793,7 +804,7 @@ const MovieDetailPage = () => {
                   </Grid>
                   
                   <Grid item xs={12} sm={6}>
-                    <Paper sx={{ p: 2, borderRadius: 2, background: 'rgba(76, 175, 80, 0.05)' }}>
+                    <Paper sx={{ p: 2, borderRadius: 2, background: darkMode ? 'rgba(76, 175, 80, 0.05)' : 'rgba(76, 175, 80, 0.08)' }}>
                       <Typography variant="subtitle1" sx={{ mb: 1, fontWeight: 'bold' }}>
                         {user ? 'Puanınız' : 'Puan vermek için giriş yapın'}
                       </Typography>
@@ -823,7 +834,7 @@ const MovieDetailPage = () => {
                 sx={{ 
                   p: 4, 
                   borderRadius: 4,
-                  background: 'rgba(30, 30, 30, 0.95)',
+                  background: darkMode ? 'rgba(30, 30, 30, 0.95)' : 'rgba(255, 255, 255, 0.95)',
                   backdropFilter: 'blur(10px)'
                 }}
                 elevation={10}
@@ -850,10 +861,12 @@ const MovieDetailPage = () => {
                           alignItems: 'flex-start',
                           p: 2,
                           borderRadius: 2,
-                          background: index % 2 === 0 ? 'rgba(0,0,0,0.03)' : 'transparent',
+                          background: index % 2 === 0 
+                            ? (darkMode ? 'rgba(0,0,0,0.03)' : 'rgba(0,0,0,0.02)') 
+                            : 'transparent',
                           transition: 'background 0.2s ease',
                           '&:hover': {
-                            background: 'rgba(25, 118, 210, 0.05)'
+                            background: darkMode ? 'rgba(25, 118, 210, 0.05)' : 'rgba(25, 118, 210, 0.08)'
                           }
                         }}
                       >
@@ -884,7 +897,7 @@ const MovieDetailPage = () => {
               mt: 4, 
               p: 3, 
               borderRadius: 4,
-              background: 'rgba(30, 30, 30, 0.95)',
+              background: darkMode ? 'rgba(30, 30, 30, 0.95)' : 'rgba(255, 255, 255, 0.95)',
               backdropFilter: 'blur(10px)'
             }}
             elevation={10}
@@ -900,8 +913,8 @@ const MovieDetailPage = () => {
                 <Box sx={{ 
                   p: 2, 
                   borderRadius: 2,
-                  border: '1px solid rgba(255,255,255,0.1)',
-                  background: 'rgba(25, 118, 210, 0.02)'
+                  border: `1px solid ${darkMode ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.1)'}`,
+                  background: darkMode ? 'rgba(25, 118, 210, 0.02)' : 'rgba(25, 118, 210, 0.05)'
                 }}>
                   <Box display="flex" gap={2} alignItems="flex-start">
                     <Avatar 
@@ -952,7 +965,7 @@ const MovieDetailPage = () => {
                 <Box sx={{ 
                   p: 3, 
                   textAlign: 'center',
-                  border: '1px dashed rgba(255,255,255,0.2)',
+                  border: `1px dashed ${darkMode ? 'rgba(255,255,255,0.2)' : 'rgba(0,0,0,0.2)'}`,
                   borderRadius: 2
                 }}>
                   <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
@@ -979,7 +992,7 @@ const MovieDetailPage = () => {
                       <Divider 
                         sx={{ 
                           my: 1, 
-                          bgcolor: 'rgba(255,255,255,0.05)'
+                          bgcolor: darkMode ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.05)'
                         }} 
                       />
                     )}
@@ -991,7 +1004,7 @@ const MovieDetailPage = () => {
                 sx={{ 
                   p: 4, 
                   textAlign: 'center',
-                  border: '1px dashed rgba(255,255,255,0.2)',
+                  border: `1px dashed ${darkMode ? 'rgba(255,255,255,0.2)' : 'rgba(0,0,0,0.2)'}`,
                   borderRadius: 2
                 }}
               >

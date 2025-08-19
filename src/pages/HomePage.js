@@ -29,9 +29,6 @@ import SearchIcon from '@mui/icons-material/Search';
 import MovieIcon from '@mui/icons-material/Movie';
 import TvIcon from '@mui/icons-material/Tv';
 import TheatersIcon from '@mui/icons-material/Theaters';
-import EmojiEmotionsIcon from '@mui/icons-material/EmojiEmotions';
-import MoodBadIcon from '@mui/icons-material/MoodBad';
-import FilterListIcon from '@mui/icons-material/FilterList';
 import ExploreIcon from '@mui/icons-material/Explore';
 import FavoriteIcon from '@mui/icons-material/Favorite';
 
@@ -41,8 +38,8 @@ const HomePage = () => {
   const isDark = theme.palette.mode === 'dark';
 
   const [searchTerm, setSearchTerm] = useState('');
-  const [movies, setMovies] = useState([]);
-  const [loading, setLoading] = useState(false);
+  const [searchResults, setSearchResults] = useState(null);
+  const [loadingSearch, setLoadingSearch] = useState(false);
   const [popularMovies, setPopularMovies] = useState([]);
   const [popularSeries, setPopularSeries] = useState([]);
   const [actionMovies, setActionMovies] = useState([]);
@@ -63,47 +60,43 @@ const HomePage = () => {
     'Breaking_Bad', 'Game_of_Thrones', 'Friends', 'The_Office', 'Stranger_Things',
     'The_Crown', 'Narcos', 'House_of_Cards', 'Sherlock', 'Lost'
   ];
-
   const actionKeywords = [
     'John_Wick', 'Die_Hard', 'Mad_Max', 'Rambo', 'Rocky', 
     'Gladiator', 'Matrix', 'Taken', 'Bourne', 'Top_Gun'
   ];
-
   const horrorKeywords = [
     'Halloween', 'Friday_the_13th', 'Nightmare', 'Scream', 'It',
     'Conjuring', 'Insidious', 'Paranormal_Activity', 'Saw', 'Exorcist'
   ];
-
   const comedyKeywords = [
     'Hangover', 'Anchorman', 'Dumb_and_Dumber', 'Ghostbusters', 'Superbad',
     'Step_Brothers', 'Tropic_Thunder', 'Zoolander', 'Wedding_Crashers', 'Meet_the_Parents'
   ];
 
-const fetchMostFavorited = async () => {
-  setLoadingMostFavorited(true);
-  try {
-    const response = await interactionApi.getMostFavorited();
-    if (response.data) {
-      // API sadece imdbId listesi dönüyor, detayları tek tek çekiyoruz
-      const moviePromises = response.data.map(async (imdbId) => {
-        try {
-          const movieResponse = await omdbApi.searchById(imdbId);
-          return movieResponse.data;
-        } catch (error) {
-          console.error(`Error fetching movie ${imdbId}:`, error);
-          return null;
-        }
-      });
-      
-      const movies = await Promise.all(moviePromises);
-      setMostFavorited(movies.filter(movie => movie !== null));
+  const fetchMostFavorited = async () => {
+    setLoadingMostFavorited(true);
+    try {
+      const response = await interactionApi.getMostFavorited();
+      if (response.data) {
+        const moviePromises = response.data.map(async (imdbId) => {
+          try {
+            const movieResponse = await omdbApi.searchById(imdbId);
+            return movieResponse.data;
+          } catch (error) {
+            console.error(`Error fetching movie ${imdbId}:`, error);
+            return null;
+          }
+        });
+        const movies = await Promise.all(moviePromises);
+        setMostFavorited(movies.filter(movie => movie !== null));
+      }
+    } catch (error) {
+      console.error('Error fetching most favorited:', error);
+    } finally {
+      setLoadingMostFavorited(false);
     }
-  } catch (error) {
-    console.error('Error fetching most favorited:', error);
-  } finally {
-    setLoadingMostFavorited(false);
-  }
-};
+  };
+
   const fetchCategoryMovies = async (keywords, setterFunction) => {
     try {
       const promises = keywords.slice(0, 5).map(async (keyword) => {
@@ -118,14 +111,11 @@ const fetchMostFavorited = async () => {
           return [];
         }
       });
-
       const results = await Promise.all(promises);
       const allMovies = results.flat();
-      
       const uniqueMovies = allMovies.filter((movie, index, self) => 
         index === self.findIndex(m => m.imdbID === movie.imdbID)
       );
-
       setterFunction(uniqueMovies.slice(0, 8));
     } catch (error) {
       console.error('Error fetching category movies:', error);
@@ -135,7 +125,6 @@ const fetchMostFavorited = async () => {
   useEffect(() => {
     const loadCategories = async () => {
       setLoadingCategories(true);
-      
       await Promise.all([
         fetchCategoryMovies(popularMovieKeywords, setPopularMovies),
         fetchCategoryMovies(popularSeriesKeywords, setPopularSeries),
@@ -144,30 +133,30 @@ const fetchMostFavorited = async () => {
         fetchCategoryMovies(comedyKeywords, setComedyMovies),
         fetchMostFavorited()
       ]);
-      
       setLoadingCategories(false);
     };
-
     loadCategories();
   }, []);
 
-  const searchMovies = async () => {
-    if (!searchTerm.trim()) return;
-    
-    setLoading(true);
+  const handleSearch = async () => {
+    if (!searchTerm.trim()) {
+      setSearchResults(null);
+      return;
+    }
+
+    setLoadingSearch(true);
     try {
       const response = await omdbApi.search(searchTerm);
-      
       if (response.data?.Search) {
-        setMovies(response.data.Search);
+        setSearchResults(response.data.Search);
       } else {
-        setMovies([]);
+        setSearchResults([]);
       }
     } catch (error) {
       console.error('Search error:', error);
-      setMovies([]);
+      setSearchResults([]);
     } finally {
-      setLoading(false);
+      setLoadingSearch(false);
     }
   };
 
@@ -177,27 +166,16 @@ const fetchMostFavorited = async () => {
         (filterType === 'movie' && movie.Type === 'movie') ||
         (filterType === 'series' && movie.Type === 'series');
       
-      return typeMatch;
+      const genreMatch = filterGenre === 'all' || 
+        (filterGenre === 'action' && actionKeywords.some(keyword => movie.Title.includes(keyword.replace(/_/g, ' ')))) ||
+        (filterGenre === 'horror' && horrorKeywords.some(keyword => movie.Title.includes(keyword.replace(/_/g, ' ')))) ||
+        (filterGenre === 'comedy' && comedyKeywords.some(keyword => movie.Title.includes(keyword.replace(/_/g, ' ')))) ||
+        (filterGenre === 'action' && movie.Title.includes('Action')) ||
+        (filterGenre === 'horror' && movie.Title.includes('Horror')) ||
+        (filterGenre === 'comedy' && movie.Title.includes('Comedy'));
+      
+      return typeMatch && genreMatch;
     });
-  };
-
-  const getCategoryIcon = (category) => {
-    switch (category) {
-      case '🔥 En Çok Favorilenenler':
-      return <FavoriteIcon sx={{ mr: 1, color: '#e91e63' }} />;
-      case '🎬 Popüler Filmler':
-        return <MovieIcon sx={{ mr: 1, color: '#1976d2' }} />;
-      case '📺 Popüler Diziler':
-        return <TvIcon sx={{ mr: 1, color: '#9c27b0' }} />;
-      case '💥 Aksiyon Filmleri':
-        return <TheatersIcon sx={{ mr: 1, color: '#f44336' }} />;
-      case '👻 Korku Filmleri':
-        return <MoodBadIcon sx={{ mr: 1, color: '#ff9800' }} />;
-      case '😄 Komedi Filmleri':
-        return <EmojiEmotionsIcon sx={{ mr: 1, color: '#4caf50' }} />;
-      default:
-        return null;
-    }
   };
 
   const MovieCard = ({ movie }) => (
@@ -209,23 +187,15 @@ const fetchMostFavorited = async () => {
         display: 'flex', 
         flexDirection: 'column',
         transition: 'all 0.3s ease',
-        background: isDark 
-          ? 'rgba(30, 30, 30, 0.8)' 
-          : 'rgba(255, 255, 255, 0.9)',
+        background: theme.palette.background.paper,
         borderRadius: '12px',
         overflow: 'hidden',
-        border: isDark 
-          ? '1px solid rgba(255, 255, 255, 0.1)' 
-          : '1px solid rgba(0, 0, 0, 0.1)',
-        boxShadow: isDark 
-          ? '0 8px 16px rgba(0,0,0,0.2)' 
-          : '0 8px 16px rgba(0,0,0,0.1)',
+        border: `1px solid ${theme.palette.divider}`,
+        boxShadow: theme.shadows[isDark ? 8 : 4],
         textDecoration: 'none',
         '&:hover': {
           transform: 'translateY(-8px)',
-          boxShadow: isDark 
-            ? '0 12px 24px rgba(0,0,0,0.4)' 
-            : '0 12px 24px rgba(0,0,0,0.2)',
+          boxShadow: theme.shadows[isDark ? 16 : 8],
           '& .poster-overlay': {
             opacity: 1
           }
@@ -247,7 +217,6 @@ const fetchMostFavorited = async () => {
             objectFit: 'cover'
           }}
         />
-
         <Box className="poster-overlay" sx={{
           position: 'absolute',
           top: 0,
@@ -292,7 +261,6 @@ const fetchMostFavorited = async () => {
             />
           </Box>
         </Box>
-
         <Chip 
           label={movie.Type === 'movie' ? 'Film' : 'Dizi'} 
           size="small"
@@ -310,57 +278,51 @@ const fetchMostFavorited = async () => {
     </Card>
   );
 
-
-
-
   const MovieGrid = ({ movies, title }) => (
     <Fade in timeout={800}>
       <Box sx={{ mb: 5 }}>
-
-<Paper 
-  elevation={2}
-  sx={{ 
-    p: 3, 
-    mb: 3, 
-    borderRadius: 3,
-    background: 'rgba(30, 30, 30, 0.7)',
-    backdropFilter: 'blur(10px)',
-    border: '1px solid rgba(255, 255, 255, 0.1)',
-    boxShadow: '0 8px 32px rgba(0, 0, 0, 0.3)'
-  }}
->
+        <Paper 
+          elevation={2}
+          sx={{ 
+            p: 3, 
+            mb: 3, 
+            borderRadius: 3,
+            background: theme.palette.background.paper,
+            backdropFilter: 'blur(10px)',
+            border: `1px solid ${theme.palette.divider}`,
+            boxShadow: theme.shadows[isDark ? 8 : 4]
+          }}
+        >
           <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
-
-<Typography 
-  variant="h5" 
-  sx={{ 
-    fontWeight: 'bold',
-    color: '#ffffff',
-    textShadow: '1px 1px 2px rgba(0,0,0,0.3)',
-    mb: 3,
-    position: 'relative',
-    '&:after': {
-      content: '""',
-      display: 'block',
-      width: '60px',
-      height: '4px',
-      background: 'linear-gradient(45deg, #1976d2, #42a5f5)',
-      borderRadius: '2px',
-      mt: 1
-    }
-  }}
->
-  {title}
-</Typography>
+            <Typography 
+              variant="h5" 
+              sx={{ 
+                fontWeight: 'bold',
+                color: theme.palette.text.primary,
+                textShadow: '1px 1px 2px rgba(0,0,0,0.3)',
+                mb: 3,
+                position: 'relative',
+                '&:after': {
+                  content: '""',
+                  display: 'block',
+                  width: '60px',
+                  height: '4px',
+                  background: 'linear-gradient(45deg, #1976d2, #42a5f5)',
+                  borderRadius: '2px',
+                  mt: 1
+                }
+              }}
+            >
+              {title}
+            </Typography>
           </Box>
-
-<Grid container spacing={3}>
-  {movies.map((movie) => (
-    <Grid item xs={6} sm={4} md={3} lg={2.4} key={movie.imdbID}>
-      <MovieCard movie={movie} />
-    </Grid>
-  ))}
-</Grid>
+          <Grid container spacing={3}>
+            {movies.map((movie) => (
+              <Grid item xs={6} sm={4} md={3} lg={2.4} key={movie.imdbID}>
+                <MovieCard movie={movie} />
+              </Grid>
+            ))}
+          </Grid>
         </Paper>
       </Box>
     </Fade>
@@ -369,14 +331,12 @@ const fetchMostFavorited = async () => {
   return (
     <Box sx={{ 
       minHeight: '100vh',
-      background: isDark 
-        ? 'linear-gradient(135deg, #1a1a1a 0%, #2d2d2d 100%)'
-        : 'linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%)',
+      background: theme.palette.background.default,
       pb: 4,
       transition: 'background 0.3s ease'
     }}>
       <Container maxWidth="xl" sx={{ py: 4 }}>
-        {/* Hero Search Section */}
+        {/* Search & Filter Section */}
         <Fade in timeout={600}>
           <Paper 
             elevation={10} 
@@ -384,33 +344,15 @@ const fetchMostFavorited = async () => {
               p: { xs: 3, md: 5 }, 
               mb: 4, 
               borderRadius: 4,
-              background: isDark 
-                ? 'rgba(30, 30, 30, 0.95)' 
-                : 'rgba(255, 255, 255, 0.95)',
+              background: theme.palette.background.paper,
               backdropFilter: 'blur(15px)',
-              border: isDark 
-                ? '1px solid rgba(255, 255, 255, 0.1)' 
-                : '1px solid rgba(0, 0, 0, 0.1)',
+              border: `1px solid ${theme.palette.divider}`,
               position: 'relative',
               overflow: 'hidden'
             }}
           >
-            <Box
-              sx={{
-                position: 'absolute',
-                top: -50,
-                right: -50,
-                width: 200,
-                height: 200,
-                background: isDark 
-                  ? 'radial-gradient(circle, rgba(25, 118, 210, 0.1) 0%, transparent 70%)'
-                  : 'radial-gradient(circle, rgba(25, 118, 210, 0.2) 0%, transparent 70%)',
-                borderRadius: '50%'
-              }}
-            />
-            
-            <Box sx={{ position: 'relative', zIndex: 1 }}>
-              <Box sx={{ textAlign: 'center', mb: 4 }}>
+            <Box sx={{ position: 'relative', zIndex: 1, textAlign: 'center' }}>
+              <Box sx={{ mb: 4 }}>
                 <ExploreIcon sx={{ fontSize: 48, color: theme.palette.primary.main, mb: 2 }} />
                 <Typography 
                   variant="h3" 
@@ -436,189 +378,137 @@ const fetchMostFavorited = async () => {
                 display: 'flex', 
                 flexDirection: isMobile ? 'column' : 'row',
                 gap: 2,
-                maxWidth: '800px',
-                mx: 'auto'
+                maxWidth: '900px',
+                mx: 'auto',
+                alignItems: 'center',
+                justifyContent: 'center'
               }}>
                 <TextField
                   fullWidth
                   label="Film veya dizi adı girin..."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
-                  onKeyPress={(e) => e.key === 'Enter' && searchMovies()}
+                  onKeyPress={(e) => {
+                    if (e.key === 'Enter') {
+                      handleSearch();
+                    }
+                  }}
                   variant="filled"
+                  InputProps={{
+                    startAdornment: (
+                      <InputLabel htmlFor="search-input" sx={{ color: theme.palette.text.secondary, pr: 1 }}>
+                        <SearchIcon sx={{ color: theme.palette.primary.main }} />
+                      </InputLabel>
+                    ),
+                    disableUnderline: true,
+                    sx: { borderRadius: 2 }
+                  }}
                   sx={{
                     '& .MuiFilledInput-root': {
-                      backgroundColor: isDark 
-                        ? 'rgba(255, 255, 255, 0.1)' 
-                        : 'rgba(255, 255, 255, 0.8)',
+                      backgroundColor: theme.palette.action.hover,
                       borderRadius: 2,
                       '&:hover': {
-                        backgroundColor: isDark 
-                          ? 'rgba(255, 255, 255, 0.15)' 
-                          : 'rgba(255, 255, 255, 0.9)',
+                        backgroundColor: theme.palette.action.selected,
                       },
                       '&.Mui-focused': {
-                        backgroundColor: isDark 
-                          ? 'rgba(255, 255, 255, 0.2)' 
-                          : 'rgba(255, 255, 255, 1)',
+                        backgroundColor: theme.palette.action.selected,
                       }
                     }
                   }}
                 />
-                <Button 
-                  variant="contained" 
-                  onClick={searchMovies} 
-                  disabled={loading || !searchTerm.trim()}
-                  sx={{ 
-                    minWidth: isMobile ? '100%' : '140px',
-                    height: isMobile ? '56px' : '56px',
-                    fontWeight: 'bold',
-                    borderRadius: 2,
-                    background: 'linear-gradient(45deg, #1976d2, #42a5f5)',
-                    '&:hover': {
-                      background: 'linear-gradient(45deg, #1565c0, #1976d2)',
-                      transform: 'translateY(-2px)',
-                      boxShadow: '0 6px 20px rgba(25, 118, 210, 0.4)'
-                    },
-                    '&:disabled': {
-                      background: theme.palette.action.disabledBackground,
-                      color: theme.palette.action.disabled
-                    },
-                    transition: 'all 0.3s ease'
-                  }}
-                  startIcon={loading ? <CircularProgress size={20} color="inherit" /> : <SearchIcon />}
-                >
-                  {loading ? 'Aranıyor...' : 'Ara'}
-                </Button>
+                
+                <FormControl sx={{ minWidth: 120 }} size="small">
+                    <InputLabel id="filter-type-label" sx={{ color: theme.palette.text.primary }}>Tür</InputLabel>
+                    <Select
+                      labelId="filter-type-label"
+                      value={filterType}
+                      label="Tür"
+                      onChange={(e) => setFilterType(e.target.value)}
+                      sx={{ 
+                        color: theme.palette.text.primary,
+                        '.MuiOutlinedInput-notchedOutline': { borderColor: theme.palette.divider },
+                        '&:hover .MuiOutlinedInput-notchedOutline': { borderColor: theme.palette.primary.main },
+                        '.MuiSvgIcon-root': { color: theme.palette.action.active }
+                      }}
+                    >
+                      <MenuItem value="all">Tümü</MenuItem>
+                      <MenuItem value="movie">Filmler</MenuItem>
+                      <MenuItem value="series">Diziler</MenuItem>
+                    </Select>
+                  </FormControl>
+                  <Button 
+                    variant="contained" 
+                    onClick={handleSearch} 
+                    disabled={loadingSearch || !searchTerm.trim()}
+                    sx={{ 
+                      minWidth: isMobile ? '100%' : '140px',
+                      height: '56px',
+                      fontWeight: 'bold',
+                      borderRadius: 2,
+                      background: 'linear-gradient(45deg, #1976d2, #42a5f5)',
+                      '&:hover': {
+                        background: 'linear-gradient(45deg, #1565c0, #1976d2)',
+                        transform: 'translateY(-2px)',
+                        boxShadow: '0 6px 20px rgba(25, 118, 210, 0.4)'
+                      },
+                      '&:disabled': {
+                        background: theme.palette.action.disabledBackground,
+                        color: theme.palette.action.disabled
+                      },
+                      transition: 'all 0.3s ease'
+                    }}
+                    startIcon={loadingSearch ? <CircularProgress size={20} color="inherit" /> : <SearchIcon />}
+                  >
+                    {loadingSearch ? 'Aranıyor...' : 'Ara'}
+                  </Button>
               </Box>
             </Box>
           </Paper>
         </Fade>
 
-        {/* Filters Section */}
-        <Fade in timeout={800}>
-          <Paper 
-            elevation={3} 
-            sx={{ 
-              p: 3, 
-              mb: 4, 
-              borderRadius: 3,
-              background: 'rgba(30, 30, 30, 0.95)',
-              backdropFilter: 'blur(10px)',
-              border: '1px solid rgba(255, 255, 255, 0.1)'
-            }}
-          >
-            <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
-              <FilterListIcon sx={{ mr: 1, color: '#1976d2' }} />
-              <Typography variant="h6" sx={{ fontWeight: 'bold', color: '#ffffff' }}>
-                Filtrele
-              </Typography>
-            </Box>
-            <Divider sx={{ mb: 3, borderColor: 'rgba(255,255,255,0.1)' }} />
-            <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 2 }}>
-              <FormControl sx={{ minWidth: 120 }} size="small">
-                <InputLabel sx={{ color: 'rgba(255,255,255,0.7)' }}>Tür</InputLabel>
-                <Select
-                  value={filterType}
-                  label="Tür"
-                  onChange={(e) => setFilterType(e.target.value)}
-                  sx={{ 
-                    color: '#ffffff',
-                    '.MuiOutlinedInput-notchedOutline': {
-                      borderColor: 'rgba(255,255,255,0.3)'
-                    },
-                    '&:hover .MuiOutlinedInput-notchedOutline': {
-                      borderColor: 'rgba(255,255,255,0.5)'
-                    },
-                    '.MuiSvgIcon-root': {
-                      color: '#ffffff'
-                    }
-                  }}
-                >
-                  <MenuItem value="all">Tümü</MenuItem>
-                  <MenuItem value="movie">Filmler</MenuItem>
-                  <MenuItem value="series">Diziler</MenuItem>
-                </Select>
-              </FormControl>
-
-              <FormControl sx={{ minWidth: 120 }} size="small">
-                <InputLabel sx={{ color: 'rgba(255,255,255,0.7)' }}>Kategori</InputLabel>
-                <Select
-                  value={filterGenre}
-                  label="Kategori"
-                  onChange={(e) => setFilterGenre(e.target.value)}
-                  sx={{ 
-                    color: '#ffffff',
-                    '.MuiOutlinedInput-notchedOutline': {
-                      borderColor: 'rgba(255,255,255,0.3)'
-                    },
-                    '&:hover .MuiOutlinedInput-notchedOutline': {
-                      borderColor: 'rgba(255,255,255,0.5)'
-                    },
-                    '.MuiSvgIcon-root': {
-                      color: '#ffffff'
-                    }
-                  }}
-                >
-                  <MenuItem value="all">Tümü</MenuItem>
-                  <MenuItem value="action">Aksiyon</MenuItem>
-                  <MenuItem value="horror">Korku</MenuItem>
-                  <MenuItem value="comedy">Komedi</MenuItem>
-                </Select>
-              </FormControl>
-            </Box>
-          </Paper>
-        </Fade>
-
-        {/* Search Results */}
-        {loading ? (
-          <Backdrop open sx={{ zIndex: 1300, color: '#fff' }}>
-            <Box sx={{ textAlign: 'center' }}>
-              <CircularProgress size={60} />
-              <Typography sx={{ mt: 2 }}>Aranıyor...</Typography>
-            </Box>
-          </Backdrop>
-        ) : movies.length > 0 ? (
-          <>
-            <Typography variant="h5" sx={{ mb: 3, fontWeight: 'bold', color: '#ffffff' }}>
-              Arama Sonuçları
-            </Typography>
-            <MovieGrid movies={movies} title="🔍 Arama Sonuçları" />
-            <Divider sx={{ my: 4, borderColor: 'rgba(255,255,255,0.1)' }} />
-          </>
-        ) : null}
-
-        {/* Categories Section */}
-        {loadingCategories ? (
+        {/* Dynamic Content Display */}
+        {loadingSearch ? (
           <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', my: 8 }}>
-            <CircularProgress size={60} />
-            <Typography sx={{ ml: 2, color: '#ffffff', fontSize: '1.2rem' }}>Kategoriler yükleniyor...</Typography>
+            <CircularProgress size={60} color="primary" />
+            <Typography sx={{ ml: 2, color: theme.palette.text.primary, fontSize: '1.2rem' }}>Aranıyor...</Typography>
+          </Box>
+        ) : searchResults && searchResults.length > 0 ? (
+          <MovieGrid movies={filterMovies(searchResults)} title={`"${searchTerm}" için Sonuçlar`} />
+        ) : searchResults && searchResults.length === 0 ? (
+          <Box sx={{ my: 4, textAlign: 'center' }}>
+            <Typography variant="h6" sx={{ color: theme.palette.text.secondary }}>
+              "{searchTerm}" için sonuç bulunamadı.
+            </Typography>
           </Box>
         ) : (
-          <>
-          {mostFavorited.length > 0 && (
-      <MovieGrid movies={mostFavorited} title="🔥 En Çok Favorilenenler" />
-    )}
-            {popularMovies.length > 0 && (
-              <MovieGrid movies={popularMovies} title="🎬 Popüler Filmler" />
-            )}
-            
-            {popularSeries.length > 0 && (
-              <MovieGrid movies={popularSeries} title="📺 Popüler Diziler" />
-            )}
-            
-            {actionMovies.length > 0 && (
-              <MovieGrid movies={actionMovies} title="💥 Aksiyon Filmleri" />
-            )}
-            
-            {horrorMovies.length > 0 && (
-              <MovieGrid movies={horrorMovies} title="👻 Korku Filmleri" />
-            )}
-            
-            {comedyMovies.length > 0 && (
-              <MovieGrid movies={comedyMovies} title="😄 Komedi Filmleri" />
-            )}
-          </>
+          /* Categories Section - Sadece searchResults null ise gösterilir */
+          loadingCategories ? (
+            <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', my: 8 }}>
+              <CircularProgress size={60} color="primary" />
+              <Typography sx={{ ml: 2, color: theme.palette.text.primary, fontSize: '1.2rem' }}>Kategoriler yükleniyor...</Typography>
+            </Box>
+          ) : (
+            <>
+              {mostFavorited.length > 0 && (
+                <MovieGrid movies={filterMovies(mostFavorited)} title="🔥 En Çok Favorilenenler" />
+              )}
+              {popularMovies.length > 0 && (
+                <MovieGrid movies={filterMovies(popularMovies)} title="🎬 Popüler Filmler" />
+              )}
+              {popularSeries.length > 0 && (
+                <MovieGrid movies={filterMovies(popularSeries)} title="📺 Popüler Diziler" />
+              )}
+              {actionMovies.length > 0 && (
+                <MovieGrid movies={filterMovies(actionMovies)} title="💥 Aksiyon Filmleri" />
+              )}
+              {horrorMovies.length > 0 && (
+                <MovieGrid movies={filterMovies(horrorMovies)} title="👻 Korku Filmleri" />
+              )}
+              {comedyMovies.length > 0 && (
+                <MovieGrid movies={filterMovies(comedyMovies)} title="😄 Komedi Filmleri" />
+              )}
+            </>
+          )
         )}
       </Container>
     </Box>

@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { userApi, adminApi, moderatorApi } from '../api';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '@mui/material/styles';
+import StatisticsPage from './StatisticsPage';
 import {
   Typography,
   Box,
@@ -37,7 +38,8 @@ import {
   Person as PersonIcon,
   Comment as CommentIcon,
   Email as EmailIcon,
-  ContactMail as ContactMailIcon
+  ContactMail as ContactMailIcon,
+  BarChart as BarChartIcon
 } from '@mui/icons-material';
 
 function TabPanel(props) {
@@ -278,12 +280,12 @@ const AdminPage = () => {
 
   // Calculate tab indexes based on user role
   const getTabIndex = (tabName) => {
-    const tabs = [];
-    if (user.role === 'ROLE_ADMIN') tabs.push('users', 'comments', 'contact');
-    else tabs.push('comments');
-    
-    return tabs.indexOf(tabName);
-  };
+  const tabs = [];
+  if (user.role === 'ROLE_ADMIN') tabs.push('statistics', 'users', 'comments', 'contact');
+  else tabs.push('comments');
+  
+  return tabs.indexOf(tabName);
+};
 
   return (
     <Box sx={{ p: 3, maxWidth: 1200, mx: 'auto' }}>
@@ -325,16 +327,23 @@ const AdminPage = () => {
             }
           }}
         >
-          {user.role === 'ROLE_ADMIN' && (
-            <Tab icon={<PersonIcon />} label="Kullanıcı Yönetimi" iconPosition="start" />
-          )}
-          <Tab icon={<CommentIcon />} label="Yorum Yönetimi" iconPosition="start" />
-          {user.role === 'ROLE_ADMIN' && (
-            <Tab icon={<ContactMailIcon />} label="İletişim Mesajları" iconPosition="start" />
-          )}
+            {user.role === 'ROLE_ADMIN' && (
+    <Tab icon={<BarChartIcon />} label="İstatistikler" iconPosition="start" />
+  )}
+  {user.role === 'ROLE_ADMIN' && (
+    <Tab icon={<PersonIcon />} label="Kullanıcı Yönetimi" iconPosition="start" />
+  )}
+  <Tab icon={<CommentIcon />} label="Yorum Yönetimi" iconPosition="start" />
+  {user.role === 'ROLE_ADMIN' && (
+    <Tab icon={<ContactMailIcon />} label="İletişim Mesajları" iconPosition="start" />
+  )}
         </Tabs>
       </Paper>
-
+{user.role === 'ROLE_ADMIN' && (
+  <TabPanel value={activeTab} index={getTabIndex('statistics')}>
+    <StatisticsPage />
+  </TabPanel>
+)}
       {/* User Management Tab (Admin only) */}
       {user.role === 'ROLE_ADMIN' && (
   <TabPanel value={activeTab} index={getTabIndex('users')}>
