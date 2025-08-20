@@ -52,12 +52,12 @@ const StatisticsPage = () => {
 
   // Modern color palette
   const colors = {
-    primary: isDark ? '#6366f1' : '#6366f1',
-    secondary: isDark ? '#f59e0b' : '#f59e0b',
-    success: isDark ? '#10b981' : '#10b981',
-    info: isDark ? '#06b6d4' : '#06b6d4',
-    warning: isDark ? '#f59e0b' : '#f59e0b',
-    error: isDark ? '#ef4444' : '#ef4444',
+    primary: '#6366f1',
+    secondary: '#f59e0b',
+    success: '#10b981',
+    info: '#06b6d4',
+    warning: '#f59e0b',
+    error: '#ef4444',
     text: isDark ? '#e0e0e0' : '#424242'
   };
 
@@ -135,23 +135,23 @@ const StatisticsPage = () => {
       <Box sx={{
         display: 'flex',
         flexDirection: 'column',
-        gap: 3,
-        p: isMobile ? 1 : 3,
+        gap: 2,
+        p: isMobile ? 1 : 2,
         maxWidth: 1600,
         mx: 'auto'
       }}>
-        <Grid container spacing={3}>
+        <Grid container spacing={2}>
           {Array.from({ length: 4 }).map((_, index) => (
-            <Grid item xs={12} sm={6} md={3} key={index}>
-              <Skeleton variant="rectangular" height={120} sx={{ borderRadius: 2 }} />
+            <Grid item xs={6} sm={3} key={index}>
+              <Skeleton variant="rectangular" height={100} sx={{ borderRadius: 2 }} />
             </Grid>
           ))}
         </Grid>
-        <Skeleton variant="rectangular" height={350} sx={{ borderRadius: 2 }} />
-        <Grid container spacing={3}>
+        <Skeleton variant="rectangular" height={300} sx={{ borderRadius: 2, mt: 2 }} />
+        <Grid container spacing={2} sx={{ mt: 0.5 }}>
           {Array.from({ length: 2 }).map((_, index) => (
             <Grid item xs={12} md={6} key={index}>
-              <Skeleton variant="rectangular" height={400} sx={{ borderRadius: 2 }} />
+              <Skeleton variant="rectangular" height={350} sx={{ borderRadius: 2 }} />
             </Grid>
           ))}
         </Grid>
@@ -161,7 +161,7 @@ const StatisticsPage = () => {
 
   if (error) {
     return (
-      <Box sx={{ p: 3 }}>
+      <Box sx={{ p: 2 }}>
         <Alert severity="error" onClose={() => setError('')} sx={{ width: '100%' }}>
           {error}
         </Alert>
@@ -192,25 +192,29 @@ const StatisticsPage = () => {
   const StatCard = ({ title, value, icon, color, trend }) => (
     <Card sx={{
       height: '100%',
-      borderLeft: `4px solid ${color}`,
-      boxShadow: theme.shadows[2],
+      background: isDark 
+        ? `linear-gradient(135deg, ${color}20 0%, ${color}10 100%)` 
+        : `linear-gradient(135deg, ${color}08 0%, ${color}04 100%)`,
+      border: isDark ? `1px solid ${color}30` : 'none',
+      boxShadow: '0 4px 12px rgba(0,0,0,0.05)',
+      borderRadius: 2,
       transition: 'transform 0.2s, box-shadow 0.2s',
       '&:hover': {
         transform: 'translateY(-4px)',
-        boxShadow: theme.shadows[4]
+        boxShadow: '0 8px 24px rgba(0,0,0,0.1)'
       }
     }}>
-      <CardContent sx={{ p: 2, '&:last-child': { pb: 2 } }}>
+      <CardContent sx={{ p: 1.5, '&:last-child': { pb: 1.5 } }}>
         <Box sx={{
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between'
         }}>
           <Box>
-            <Typography variant="body2" color="text.secondary" sx={{ fontSize: '0.8rem' }}>
+            <Typography variant="body2" color="text.secondary" sx={{ fontSize: '0.75rem', fontWeight: 500 }}>
               {title}
             </Typography>
-            <Typography variant="h5" fontWeight="bold" color={color}>
+            <Typography variant="h5" fontWeight="bold" color={color} sx={{ mt: 0.5 }}>
               {value?.toLocaleString() || 0}
             </Typography>
             {trend && (
@@ -230,10 +234,10 @@ const StatisticsPage = () => {
           <Avatar sx={{
             bgcolor: `${color}20`,
             color: color,
-            width: 40,
-            height: 40
+            width: 36,
+            height: 36
           }}>
-            {icon}
+            {React.cloneElement(icon, { sx: { fontSize: 18 } })}
           </Avatar>
         </Box>
       </CardContent>
@@ -241,87 +245,103 @@ const StatisticsPage = () => {
   );
 
   const OverviewTab = () => (
-    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
-      {/* Summary Cards - İki üstte, iki altta */}
-      <Grid container spacing={2}>
-        <Grid item xs={12} sm={6} md={6}>
+    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+      {/* Summary Cards */}
+      <Grid 
+    container 
+    spacing={1.5} 
+    justifyContent="center" 
+    alignItems="flex-start"
+  >
+        <Grid item xs={6} sm={3}>
           <StatCard
             title="Toplam Kullanıcı"
             value={statistics?.totalUsers}
-            icon={<PeopleIcon sx={{ fontSize: 20 }} />}
+            icon={<PeopleIcon />}
             color={colors.primary}
             trend="+12%"
           />
         </Grid>
-        <Grid item xs={12} sm={6} md={6}>
+        <Grid item xs={6} sm={3}>
           <StatCard
             title="Toplam Yorum"
             value={statistics?.totalComments}
-            icon={<CommentIcon sx={{ fontSize: 20 }} />}
+            icon={<CommentIcon />}
             color={colors.secondary}
             trend="+8%"
           />
         </Grid>
-        <Grid item xs={12} sm={6} md={6}>
+        <Grid item xs={6} sm={3}>
           <StatCard
             title="Toplam Favori"
             value={statistics?.totalFavorites}
-            icon={<FavoriteIcon sx={{ fontSize: 20 }} />}
+            icon={<FavoriteIcon />}
             color={colors.success}
             trend="+15%"
           />
         </Grid>
-        <Grid item xs={12} sm={6} md={6}>
+        <Grid item xs={6} sm={3}>
           <StatCard
             title="İletişim Mesajı"
             value={statistics?.totalContactMessages}
-            icon={<EmailIcon sx={{ fontSize: 20 }} />}
+            icon={<EmailIcon />}
             color={colors.info}
             trend="+5%"
           />
         </Grid>
       </Grid>
 
-      {/* Charts Row - Tam genişlikte alt alta */}
-      <Grid container spacing={2}>
+      {/* Charts Row */}
+      <Grid 
+    container 
+    spacing={1.5} 
+    justifyContent="center" 
+    alignItems="flex-start"
+  >
         {/* User Growth Chart */}
-        <Grid item xs={12} md={12}>
-          <Card sx={{ height: '100%', boxShadow: theme.shadows[2] }}>
-            <CardContent sx={{ p: 2 }}>
+        <Grid item xs={12} md={8}>
+          <Card sx={{ 
+            height: '100%', 
+            boxShadow: '0 4px 12px rgba(0,0,0,0.05)',
+            background: isDark ? 'rgba(255,255,255,0.02)' : '#fff',
+            border: isDark ? '1px solid rgba(255,255,255,0.05)' : 'none'
+          }}>
+            <CardContent sx={{ p: 1.5 }}>
               <Box sx={{
                 display: 'flex',
                 alignItems: 'center',
-                mb: 2,
+                mb: 1.5,
                 gap: 1
               }}>
-                <LineChartIcon color="primary" sx={{ fontSize: 20 }} />
-                <Typography variant="h6" color="primary">
+                <LineChartIcon color="primary" sx={{ fontSize: 18 }} />
+                <Typography variant="h6" color="primary" sx={{ fontSize: '1rem', fontWeight: 600 }}>
                   Kullanıcı Büyümesi
                 </Typography>
               </Box>
-              <Box sx={{ height: 250 }}>
+              <Box sx={{ height: 220 }}>
                 <ResponsiveContainer width="100%" height="100%">
                   <LineChart data={statistics?.monthlyUserGrowth || []}>
-                    <CartesianGrid strokeDasharray="3 3" stroke={isDark ? '#555' : '#eee'} />
+                    <CartesianGrid strokeDasharray="3 3" stroke={isDark ? '#444' : '#eee'} />
                     <XAxis
                       dataKey="monthYear"
-                      tick={{ fill: colors.text, fontSize: 12 }}
+                      tick={{ fill: colors.text, fontSize: 10 }}
                     />
-                    <YAxis tick={{ fill: colors.text, fontSize: 12 }} />
+                    <YAxis tick={{ fill: colors.text, fontSize: 10 }} />
                     <Tooltip
                       contentStyle={{
-                        background: isDark ? theme.palette.background.paper : '#fff',
-                        borderColor: isDark ? '#555' : '#ddd',
-                        borderRadius: 8,
-                        boxShadow: theme.shadows[3]
+                        background: isDark ? '#2D3748' : '#fff',
+                        borderColor: isDark ? '#4A5568' : '#ddd',
+                        borderRadius: 6,
+                        boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
+                        fontSize: 12
                       }}
                     />
                     <Line
                       type="monotone"
                       dataKey="userCount"
                       stroke={colors.primary}
-                      strokeWidth={3}
-                      dot={{ fill: colors.primary, strokeWidth: 2, r: 4 }}
+                      strokeWidth={2}
+                      dot={{ fill: colors.primary, strokeWidth: 2, r: 3 }}
                     />
                   </LineChart>
                 </ResponsiveContainer>
@@ -331,29 +351,34 @@ const StatisticsPage = () => {
         </Grid>
 
         {/* Role Distribution */}
-        <Grid item xs={12} md={12}>
-          <Card sx={{ height: '100%', boxShadow: theme.shadows[2] }}>
-            <CardContent sx={{ p: 2 }}>
+        <Grid item xs={12} md={4}>
+          <Card sx={{ 
+            height: '100%', 
+            boxShadow: '0 4px 12px rgba(0,0,0,0.05)',
+            background: isDark ? 'rgba(255,255,255,0.02)' : '#fff',
+            border: isDark ? '1px solid rgba(255,255,255,0.05)' : 'none'
+          }}>
+            <CardContent sx={{ p: 1.5 }}>
               <Box sx={{
                 display: 'flex',
                 alignItems: 'center',
-                mb: 2,
+                mb: 1.5,
                 gap: 1
               }}>
-                <PieChartIcon color="primary" sx={{ fontSize: 20 }} />
-                <Typography variant="h6" color="primary">
+                <PieChartIcon color="primary" sx={{ fontSize: 18 }} />
+                <Typography variant="h6" color="primary" sx={{ fontSize: '1rem', fontWeight: 600 }}>
                   Rol Dağılımı
                 </Typography>
               </Box>
-              <Box sx={{ height: 200 }}>
+              <Box sx={{ height: 160, position: 'relative' }}>
                 <ResponsiveContainer width="100%" height="100%">
                   <PieChart>
                     <Pie
                       data={roleDistributionData}
                       cx="50%"
                       cy="50%"
-                      innerRadius={40}
-                      outerRadius={70}
+                      innerRadius={35}
+                      outerRadius={60}
                       paddingAngle={2}
                       dataKey="value"
                     >
@@ -363,25 +388,26 @@ const StatisticsPage = () => {
                     </Pie>
                     <Tooltip
                       contentStyle={{
-                        background: isDark ? theme.palette.background.paper : '#fff',
-                        borderColor: isDark ? '#555' : '#ddd',
-                        borderRadius: 8,
-                        boxShadow: theme.shadows[2]
+                        background: isDark ? '#2D3748' : '#fff',
+                        borderColor: isDark ? '#4A5568' : '#ddd',
+                        borderRadius: 6,
+                        boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
+                        fontSize: 12
                       }}
                     />
                   </PieChart>
                 </ResponsiveContainer>
               </Box>
-              <Box sx={{ mt: 2, display: 'flex', flexDirection: 'column', gap: 1 }}>
+              <Box sx={{ mt: 1.5, display: 'flex', flexDirection: 'column', gap: 1 }}>
                 {roleDistributionData.map((item) => (
                   <Box key={item.name} sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                     <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                      <Box sx={{ width: 12, height: 12, borderRadius: '50%', bgcolor: item.color }} />
-                      <Typography variant="body2" color="text.secondary">
+                      <Box sx={{ width: 10, height: 10, borderRadius: '50%', bgcolor: item.color }} />
+                      <Typography variant="body2" color="text.secondary" sx={{ fontSize: '0.75rem' }}>
                         {item.name}
                       </Typography>
                     </Box>
-                    <Typography variant="body2" fontWeight="bold">
+                    <Typography variant="body2" fontWeight="bold" sx={{ fontSize: '0.8rem' }}>
                       {item.value}
                     </Typography>
                   </Box>
@@ -395,43 +421,54 @@ const StatisticsPage = () => {
   );
 
   const ChartsTab = () => (
-    <Grid container spacing={2}>
+    <Grid 
+    container 
+    spacing={1.5} 
+    justifyContent="center" 
+    alignItems="flex-start"
+  >
       {/* Most Commented Movies */}
-      <Grid item xs={12} md={12}>
-        <Card sx={{ height: '100%', boxShadow: theme.shadows[2] }}>
-          <CardContent sx={{ p: 2 }}>
+      <Grid item xs={12} md={6}>
+        <Card sx={{ 
+          height: '100%', 
+          boxShadow: '0 4px 12px rgba(0,0,0,0.05)',
+          background: isDark ? 'rgba(255,255,255,0.02)' : '#fff',
+          border: isDark ? '1px solid rgba(255,255,255,0.05)' : 'none'
+        }}>
+          <CardContent sx={{ p: 1.5 }}>
             <Box sx={{
               display: 'flex',
               alignItems: 'center',
-              mb: 2,
+              mb: 1.5,
               gap: 1
             }}>
-              <CommentIcon color="secondary" sx={{ fontSize: 20 }} />
-              <Typography variant="h6" color="secondary">
+              <CommentIcon color="secondary" sx={{ fontSize: 18 }} />
+              <Typography variant="h6" color="secondary" sx={{ fontSize: '1rem', fontWeight: 600 }}>
                 En Çok Yorumlanan Filmler
               </Typography>
             </Box>
-            <Box sx={{ height: 300 }}>
+            <Box sx={{ height: 280 }}>
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={formatChartData(statistics?.mostCommentedMovies, 'commentCount')}>
-                  <CartesianGrid strokeDasharray="3 3" stroke={isDark ? '#555' : '#eee'} />
+                  <CartesianGrid strokeDasharray="3 3" stroke={isDark ? '#444' : '#eee'} />
                   <XAxis
                     dataKey="name"
                     angle={-30}
                     textAnchor="end"
-                    height={60}
+                    height={50}
                     tick={{ fill: colors.text, fontSize: 10 }}
                   />
-                  <YAxis tick={{ fill: colors.text, fontSize: 11 }} />
+                  <YAxis tick={{ fill: colors.text, fontSize: 10 }} />
                   <Tooltip
                     contentStyle={{
-                      background: isDark ? theme.palette.background.paper : '#fff',
-                      borderColor: isDark ? '#555' : '#ddd',
-                      borderRadius: 8,
-                      boxShadow: theme.shadows[2]
+                      background: isDark ? '#2D3748' : '#fff',
+                      borderColor: isDark ? '#4A5568' : '#ddd',
+                      borderRadius: 6,
+                      boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
+                      fontSize: 12
                     }}
                   />
-                  <Bar dataKey="count" fill={colors.secondary} radius={[4, 4, 0, 0]} />
+                  <Bar dataKey="count" fill={colors.secondary} radius={[3, 3, 0, 0]} />
                 </BarChart>
               </ResponsiveContainer>
             </Box>
@@ -440,41 +477,47 @@ const StatisticsPage = () => {
       </Grid>
 
       {/* Most Favorited Movies */}
-      <Grid item xs={12} md={12}>
-        <Card sx={{ height: '100%', boxShadow: theme.shadows[2] }}>
-          <CardContent sx={{ p: 2 }}>
+      <Grid item xs={12} md={6}>
+        <Card sx={{ 
+          height: '100%', 
+          boxShadow: '0 4px 12px rgba(0,0,0,0.05)',
+          background: isDark ? 'rgba(255,255,255,0.02)' : '#fff',
+          border: isDark ? '1px solid rgba(255,255,255,0.05)' : 'none'
+        }}>
+          <CardContent sx={{ p: 1.5 }}>
             <Box sx={{
               display: 'flex',
               alignItems: 'center',
-              mb: 2,
+              mb: 1.5,
               gap: 1
             }}>
-              <FavoriteIcon color="success" sx={{ fontSize: 20 }} />
-              <Typography variant="h6" color="success.main">
+              <FavoriteIcon color="success" sx={{ fontSize: 18 }} />
+              <Typography variant="h6" color="success.main" sx={{ fontSize: '1rem', fontWeight: 600 }}>
                 En Çok Favorilenen Filmler
               </Typography>
             </Box>
-            <Box sx={{ height: 300 }}>
+            <Box sx={{ height: 280 }}>
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={formatChartData(statistics?.mostFavoritedMovies, 'favoriteCount')}>
-                  <CartesianGrid strokeDasharray="3 3" stroke={isDark ? '#555' : '#eee'} />
+                  <CartesianGrid strokeDasharray="3 3" stroke={isDark ? '#444' : '#eee'} />
                   <XAxis
                     dataKey="name"
                     angle={-30}
                     textAnchor="end"
-                    height={60}
+                    height={50}
                     tick={{ fill: colors.text, fontSize: 10 }}
                   />
-                  <YAxis tick={{ fill: colors.text, fontSize: 11 }} />
+                  <YAxis tick={{ fill: colors.text, fontSize: 10 }} />
                   <Tooltip
                     contentStyle={{
-                      background: isDark ? theme.palette.background.paper : '#fff',
-                      borderColor: isDark ? '#555' : '#ddd',
-                      borderRadius: 8,
-                      boxShadow: theme.shadows[2]
+                      background: isDark ? '#2D3748' : '#fff',
+                      borderColor: isDark ? '#4A5568' : '#ddd',
+                      borderRadius: 6,
+                      boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
+                      fontSize: 12
                     }}
                   />
-                  <Bar dataKey="count" fill={colors.success} radius={[4, 4, 0, 0]} />
+                  <Bar dataKey="count" fill={colors.success} radius={[3, 3, 0, 0]} />
                 </BarChart>
               </ResponsiveContainer>
             </Box>
@@ -485,52 +528,57 @@ const StatisticsPage = () => {
   );
 
   const ActivityTab = () => (
-    <Grid container spacing={2}>
-      {/* Recent Users */}
-      <Grid item xs={12} md={12}>
-        <Card sx={{ boxShadow: theme.shadows[2] }}>
-          <CardContent sx={{ p: 2 }}>
-            <Box sx={{
-              display: 'flex',
-              alignItems: 'center',
-              mb: 2,
-              gap: 1
-            }}>
-              <PeopleIcon color="primary" sx={{ fontSize: 20 }} />
-              <Typography variant="h6" color="primary">
-                Son Kullanıcılar
-              </Typography>
-            </Box>
-            <List sx={{ maxHeight: 320, overflow: 'auto', py: 0 }}>
-              {statistics?.recentUsers?.slice(0, 6).map((user, index) => (
-                <React.Fragment key={user.id}>
+    <Grid 
+    container 
+    spacing={1.5} 
+    justifyContent="center" 
+    alignItems="flex-start"
+  >
+    {/* Recent Users */}
+    <Grid item xs={12} md={5}>
+      <Card sx={{ 
+        height: '100%',
+        boxShadow: '0 4px 12px rgba(0,0,0,0.05)',
+        background: isDark ? 'rgba(255,255,255,0.02)' : '#fff',
+        border: isDark ? '1px solid rgba(255,255,255,0.05)' : 'none'
+      }}>
+        <CardContent sx={{ p: 1.5 }}>
+          <Box sx={{ display: 'flex', alignItems: 'center', mb: 1.5, gap: 1 }}>
+            <PeopleIcon color="primary" sx={{ fontSize: 18 }} />
+            <Typography variant="h6" color="primary" sx={{ fontSize: '1rem', fontWeight: 600 }}>
+              Son Kullanıcılar
+            </Typography>
+          </Box>
+          <List sx={{ maxHeight: 300, overflow: 'auto', py: 0 }}>
+            {statistics?.recentUsers?.slice(0, 6).map((user, index) => (
+              <React.Fragment key={user.id}>
                   <ListItem sx={{
                     px: 1,
-                    py: 1.5,
+                    py: 1,
                     transition: 'background-color 0.2s',
                     '&:hover': {
-                      backgroundColor: isDark ? 'grey.800' : 'grey.50',
+                      backgroundColor: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.03)',
                       borderRadius: 1
                     }
                   }}>
-                    <ListItemAvatar sx={{ minWidth: 40 }}>
+                    <ListItemAvatar sx={{ minWidth: 36 }}>
                       <Avatar sx={{
-                        width: 32,
-                        height: 32,
+                        width: 30,
+                        height: 30,
                         bgcolor:
                           user.role === 'ROLE_ADMIN' ? colors.error :
                             user.role === 'ROLE_MODERATOR' ? colors.warning :
                               colors.primary
                       }}>
-                        {user.role === 'ROLE_ADMIN' ? <AdminIcon sx={{ fontSize: 18 }} /> :
-                          user.role === 'ROLE_MODERATOR' ? <ModeratorIcon sx={{ fontSize: 18 }} /> :
-                            <UserIcon sx={{ fontSize: 18 }} />}
+                        {user.role === 'ROLE_ADMIN' ? <AdminIcon sx={{ fontSize: 16 }} /> :
+                          user.role === 'ROLE_MODERATOR' ? <ModeratorIcon sx={{ fontSize: 16 }} /> :
+                            <UserIcon sx={{ fontSize: 16 }} />}
                       </Avatar>
                     </ListItemAvatar>
                     <ListItemText
                       primary={
                         <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, flexWrap: 'wrap' }}>
-                          <Typography variant="body2" fontWeight="medium">
+                          <Typography variant="body2" fontWeight="medium" sx={{ fontSize: '0.8rem' }}>
                             {user.username}
                           </Typography>
                           <Chip
@@ -538,8 +586,8 @@ const StatisticsPage = () => {
                               user.role === 'ROLE_MODERATOR' ? 'Mod' : 'User'}
                             size="small"
                             sx={{
-                              height: 20,
-                              fontSize: '0.65rem',
+                              height: 18,
+                              fontSize: '0.6rem',
                               bgcolor:
                                 user.role === 'ROLE_ADMIN' ? `${colors.error}20` :
                                   user.role === 'ROLE_MODERATOR' ? `${colors.warning}20` :
@@ -554,10 +602,10 @@ const StatisticsPage = () => {
                       }
                       secondary={
                         <Box>
-                          <Typography variant="caption" color="text.secondary" sx={{ display: 'block' }}>
+                          <Typography variant="caption" color="text.secondary" sx={{ display: 'block', fontSize: '0.7rem' }}>
                             {user.email}
                           </Typography>
-                          <Typography variant="caption" color="text.secondary">
+                          <Typography variant="caption" color="text.secondary" sx={{ fontSize: '0.7rem' }}>
                             {formatDate(user.createdAt)}
                           </Typography>
                         </Box>
@@ -576,45 +624,49 @@ const StatisticsPage = () => {
       </Grid>
 
       {/* Recent Comments */}
-      <Grid item xs={12} md={12}>
-        <Card sx={{ boxShadow: theme.shadows[2] }}>
-          <CardContent sx={{ p: 2 }}>
+      <Grid item xs={12} md={6}>
+        <Card sx={{ 
+          boxShadow: '0 4px 12px rgba(0,0,0,0.05)',
+          background: isDark ? 'rgba(255,255,255,0.02)' : '#fff',
+          border: isDark ? '1px solid rgba(255,255,255,0.05)' : 'none'
+        }}>
+          <CardContent sx={{ p: 1.5 }}>
             <Box sx={{
               display: 'flex',
               alignItems: 'center',
-              mb: 2,
+              mb: 1.5,
               gap: 1
             }}>
-              <CommentIcon color="secondary" sx={{ fontSize: 20 }} />
-              <Typography variant="h6" color="secondary">
+              <CommentIcon color="secondary" sx={{ fontSize: 18 }} />
+              <Typography variant="h6" color="secondary" sx={{ fontSize: '1rem', fontWeight: 600 }}>
                 Son Yorumlar
               </Typography>
             </Box>
-            <List sx={{ maxHeight: 320, overflow: 'auto', py: 0 }}>
+            <List sx={{ maxHeight: 300, overflow: 'auto', py: 0 }}>
               {statistics?.recentComments?.slice(0, 5).map((comment, index) => (
                 <React.Fragment key={comment.id}>
                   <ListItem sx={{
                     px: 1,
-                    py: 1.5,
+                    py: 1,
                     transition: 'background-color 0.2s',
                     '&:hover': {
-                      backgroundColor: isDark ? 'grey.800' : 'grey.50',
+                      backgroundColor: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.03)',
                       borderRadius: 1
                     }
                   }}>
-                    <ListItemAvatar sx={{ minWidth: 40 }}>
+                    <ListItemAvatar sx={{ minWidth: 36 }}>
                       <Avatar sx={{
-                        width: 32,
-                        height: 32,
+                        width: 30,
+                        height: 30,
                         bgcolor: colors.secondary
                       }}>
-                        <MovieIcon sx={{ fontSize: 18 }} />
+                        <MovieIcon sx={{ fontSize: 16 }} />
                       </Avatar>
                     </ListItemAvatar>
                     <ListItemText
                       primary={
                         <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, flexWrap: 'wrap' }}>
-                          <Typography variant="body2" fontWeight="medium">
+                          <Typography variant="body2" fontWeight="medium" sx={{ fontSize: '0.8rem' }}>
                             {comment.username}
                           </Typography>
                           <Chip
@@ -622,7 +674,7 @@ const StatisticsPage = () => {
                             size="small"
                             variant="outlined"
                             color="secondary"
-                            sx={{ height: 20, fontSize: '0.65rem' }}
+                            sx={{ height: 18, fontSize: '0.6rem' }}
                           />
                         </Box>
                       }
@@ -636,14 +688,15 @@ const StatisticsPage = () => {
                               WebkitLineClamp: 2,
                               WebkitBoxOrient: 'vertical',
                               overflow: 'hidden',
-                              textOverflow: 'ellipsis'
+                              textOverflow: 'ellipsis',
+                              fontSize: '0.7rem'
                             }}
                           >
                             {comment.content}
                           </Typography>
                           <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, mt: 0.5 }}>
-                            <TimeIcon sx={{ fontSize: 12, color: colors.text }} />
-                            <Typography variant="caption" color="text.secondary">
+                            <TimeIcon sx={{ fontSize: 10, color: colors.text }} />
+                            <Typography variant="caption" color="text.secondary" sx={{ fontSize: '0.7rem' }}>
                               {formatDate(comment.createdAt)}
                             </Typography>
                           </Box>
@@ -665,34 +718,34 @@ const StatisticsPage = () => {
   );
 
   return (
-    <Box sx={{ p: isMobile ? 1 : 2, maxWidth: 1600, mx: 'auto' }}>
+    <Box sx={{ p: isMobile ? 1 : 1.5, maxWidth: 1600, mx: 'auto' }}>
       {/* Header */}
       <Card sx={{
-        mb: 2,
+        mb: 1.5,
         background: `linear-gradient(135deg, ${colors.primary} 0%, ${colors.secondary} 100%)`,
         color: 'white',
-        boxShadow: theme.shadows[4],
+        boxShadow: '0 8px 24px rgba(0,0,0,0.12)',
         borderRadius: 2
       }}>
-        <CardContent sx={{ py: 2 }}>
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+        <CardContent sx={{ py: 1.5, px: 2 }}>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
             <Box sx={{
-              width: 48,
-              height: 48,
+              width: 40,
+              height: 40,
               bgcolor: 'rgba(255, 255, 255, 0.2)',
               borderRadius: 2,
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              fontSize: 24
+              fontSize: 20
             }}>
               📊
             </Box>
             <Box>
-              <Typography variant="h4" fontWeight="bold" gutterBottom>
+              <Typography variant="h4" fontWeight="bold" gutterBottom sx={{ fontSize: '1.5rem', mb: 0.5 }}>
                 İstatistik Paneli
               </Typography>
-              <Typography variant="body2" sx={{ opacity: 0.9 }}>
+              <Typography variant="body2" sx={{ opacity: 0.9, fontSize: '0.8rem' }}>
                 Platform performansı ve kullanım analizleri
               </Typography>
             </Box>
@@ -701,16 +754,23 @@ const StatisticsPage = () => {
       </Card>
 
       {/* Navigation Tabs */}
-      <Card sx={{ mb: 2, boxShadow: theme.shadows[2] }}>
+      <Card sx={{ 
+        mb: 1.5, 
+        boxShadow: '0 4px 12px rgba(0,0,0,0.05)',
+        background: isDark ? 'rgba(255,255,255,0.02)' : '#fff',
+        border: isDark ? '1px solid rgba(255,255,255,0.05)' : 'none'
+      }}>
         <Tabs
           value={activeTab}
           onChange={(e, newValue) => setActiveTab(newValue)}
           variant="fullWidth"
           sx={{
+            minHeight: 44,
             '& .MuiTab-root': {
-              minHeight: 48,
-              fontSize: '0.875rem',
-              fontWeight: 500
+              minHeight: 44,
+              fontSize: '0.8rem',
+              fontWeight: 500,
+              py: 1
             },
             '& .Mui-selected': {
               color: colors.primary,
@@ -719,28 +779,25 @@ const StatisticsPage = () => {
           }}
         >
           <Tab
-            icon={<TrendingUpIcon />}
+            icon={<TrendingUpIcon sx={{ fontSize: 18 }} />}
             iconPosition="start"
             label="Genel Bakış"
-            sx={{ fontSize: '0.875rem' }}
           />
           <Tab
-            icon={<MovieIcon />}
+            icon={<MovieIcon sx={{ fontSize: 18 }} />}
             iconPosition="start"
             label="Film İstatistikleri"
-            sx={{ fontSize: '0.875rem' }}
           />
           <Tab
-            icon={<TimeIcon />}
+            icon={<TimeIcon sx={{ fontSize: 18 }} />}
             iconPosition="start"
             label="Son Aktiviteler"
-            sx={{ fontSize: '0.875rem' }}
           />
         </Tabs>
       </Card>
 
       {/* Tab Content */}
-      <Box sx={{ mb: 2 }}>
+      <Box sx={{ mb: 1.5 }}>
         {activeTab === 0 && <OverviewTab />}
         {activeTab === 1 && <ChartsTab />}
         {activeTab === 2 && <ActivityTab />}
@@ -748,34 +805,35 @@ const StatisticsPage = () => {
 
       {/* Summary Footer */}
       <Paper sx={{
-        p: 2,
+        p: 1.5,
         textAlign: 'center',
-        bgcolor: isDark ? 'grey.800' : 'grey.50',
+        bgcolor: isDark ? 'rgba(255,255,255,0.02)' : 'rgba(0,0,0,0.02)',
         borderRadius: 2,
-        boxShadow: theme.shadows[1]
+        boxShadow: '0 2px 8px rgba(0,0,0,0.05)',
+        border: isDark ? '1px solid rgba(255,255,255,0.05)' : 'none'
       }}>
-        <Box sx={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'center', gap: 3 }}>
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+        <Box sx={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'center', gap: 2 }}>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
             <Box sx={{ width: 8, height: 8, borderRadius: '50%', bgcolor: colors.primary }} />
-            <Typography variant="body2">
+            <Typography variant="body2" sx={{ fontSize: '0.8rem' }}>
               <strong style={{ color: colors.primary }}>{statistics?.totalUsers}</strong> kullanıcı
             </Typography>
           </Box>
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
             <Box sx={{ width: 8, height: 8, borderRadius: '50%', bgcolor: colors.secondary }} />
-            <Typography variant="body2">
+            <Typography variant="body2" sx={{ fontSize: '0.8rem' }}>
               <strong style={{ color: colors.secondary }}>{statistics?.totalComments}</strong> yorum
             </Typography>
           </Box>
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
             <Box sx={{ width: 8, height: 8, borderRadius: '50%', bgcolor: colors.success }} />
-            <Typography variant="body2">
+            <Typography variant="body2" sx={{ fontSize: '0.8rem' }}>
               <strong style={{ color: colors.success }}>{statistics?.totalFavorites}</strong> favori
             </Typography>
           </Box>
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
             <Box sx={{ width: 8, height: 8, borderRadius: '50%', bgcolor: colors.info }} />
-            <Typography variant="body2">
+            <Typography variant="body2" sx={{ fontSize: '0.8rem' }}>
               <strong style={{ color: colors.info }}>{statistics?.totalContactMessages}</strong> mesaj
             </Typography>
           </Box>

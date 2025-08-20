@@ -69,6 +69,21 @@ export const omdbApi = {
   advancedSearch: (title, type, year, page = 1) => api.get('/api/omdb/search/advanced', { 
     params: { title, type, year, page } 
   }),
+
+  // Benzer filmleri getir
+  getSimilarMovies: (title, count = 5) => {
+    return api.get(`/api/omdb/similar?title=${encodeURIComponent(title)}&count=${count}`);
+  },
+
+  // Tür bazlı benzer filmler
+  getSimilarMoviesByGenre: (genre, count = 5) => {
+    return api.get(`/api/omdb/similar/genre?genre=${encodeURIComponent(genre)}&count=${count}`);
+  },
+
+  // Gelişmiş benzer film önerisi
+  getAdvancedSimilarMovies: (imdbId, count = 5) => {
+    return api.get(`/api/omdb/similar/advanced?imdbId=${imdbId}&count=${count}`);
+  }
 };
 
 export const omdbApiId = {

@@ -1,6 +1,6 @@
 // src/components/MovieDetailPage.js
 import { useState, useEffect } from 'react';
-import { omdbApiId, interactionApi } from '../api';
+import { omdbApiId, interactionApi, omdbApi } from '../api';
 import {
   Box, Typography, Card, CardContent, CardMedia,
   TextField, Button, Rating, List, ListItem,
@@ -28,11 +28,11 @@ import ThumbUpOutlinedIcon from '@mui/icons-material/ThumbUpOutlined';
 import ReplyIcon from '@mui/icons-material/Reply';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import ExpandLessIcon from '@mui/icons-material/ExpandLess';
-import { useTheme } from '../context/ThemeContext'; // useTheme import edildi
+import { useTheme } from '../context/ThemeContext';
 
 const MovieDetailPage = () => {
   const { imdbId } = useParams();
-  const { darkMode } = useTheme(); // darkMode durumu ThemeContext'ten alınıyor
+  const { darkMode } = useTheme();
   const [movie, setMovie] = useState(null);
   const [comments, setComments] = useState([]);
   const [newComment, setNewComment] = useState('');
@@ -46,11 +46,14 @@ const MovieDetailPage = () => {
   const navigate = useNavigate();
   const [editingCommentId, setEditingCommentId] = useState(null);
   const [editingCommentContent, setEditingCommentContent] = useState('');
-  const [commentLikes, setCommentLikes] = useState({}); 
+  const [commentLikes, setCommentLikes] = useState({});
   const [userLikedComments, setUserLikedComments] = useState({});
   const [replyingTo, setReplyingTo] = useState(null);
   const [replyContent, setReplyContent] = useState('');
   const [collapsedComments, setCollapsedComments] = useState(new Set());
+  const [similarMovies, setSimilarMovies] = useState([]);
+  const [loadingSimilar, setLoadingSimilar] = useState(true);
+  const [similarError, setSimilarError] = useState(null);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -60,11 +63,40 @@ const MovieDetailPage = () => {
         
         // Film detaylarını çek
         const movieRes = await omdbApiId.search(imdbId);
-        if (movieRes.data) {
-          setMovie(movieRes.data);
-        } else {
-          throw new Error('Film bilgileri alınamadı');
-        }
+if (movieRes.data) {
+  setMovie(movieRes.data);
+
+  // Benzer filmleri çek
+  try {
+    setLoadingSimilar(true);
+    
+    // Film başlığını URL encode yap
+    const encodedTitle = encodeURIComponent(movieRes.data.Title);
+    const similarRes = await omdbApi.getSimilarMovies(encodedTitle);
+    
+    setSimilarMovies(similarRes.data.Search || []);
+  } catch (err) {
+    console.warn('Similar movies fetch error:', err);
+    
+    // Fallback: Gelişmiş benzer film araması dene
+    try {
+      const advancedSimilarRes = await omdbApi.getAdvancedSimilarMovies(imdbId);
+      if (advancedSimilarRes.data && advancedSimilarRes.data.Search) {
+        setSimilarMovies(advancedSimilarRes.data.Search);
+      } else {
+        setSimilarError('Benzer film bulunamadı');
+      }
+    } catch (fallbackErr) {
+      console.warn('Advanced similar movies fetch error:', fallbackErr);
+      setSimilarError('Benzer filmler yüklenirken hata oluştu.');
+    }
+  } finally {
+    setLoadingSimilar(false);
+  }
+
+} else {
+  throw new Error('Film bilgileri alınamadı');
+}
 
         // Yorumları ve beğenileri yanıtlarla birlikte çek - kullanıcı giriş yapmamış olsa bile
         try {
@@ -127,7 +159,7 @@ const MovieDetailPage = () => {
       }
     };
     
-    if (imdbId) {  // user kontrolü kaldırıldı
+    if (imdbId) {
       fetchData();
     }
   }, [imdbId, user]);
@@ -889,6 +921,64 @@ const MovieDetailPage = () => {
             </Grid>
           </Grid>
         </Fade>
+
+        {/* Önerilen Dizi/Film Bölümü - YORUMLARIN ÜSTÜNDE */}
+        {similarMovies.length > 0 && (
+          <Fade in timeout={1000}>
+            <Paper 
+              sx={{ 
+                p: 3, 
+                mt: 4, 
+                borderRadius: 4,
+                background: darkMode ? 'rgba(30, 30, 30, 0.95)' : 'rgba(255, 255, 255, 0.95)',
+                backdropFilter: 'blur(10px)'
+              }}
+              elevation={10}
+            >
+              <Typography variant="h5" sx={{ mb: 3, fontWeight: 'bold' }}>
+                <MovieIcon sx={{ mr: 1, verticalAlign: 'middle' }} />
+                Önerilen Dizi/Film
+              </Typography>
+              <Grid container spacing={2}>
+                {similarMovies.map((similarMovie) => (
+                  <Grid item xs={6} sm={4} md={3} lg={2.4} key={similarMovie.imdbID}>
+                    <Card 
+                      onClick={() => navigate(`/movie/${similarMovie.imdbID}`)}
+                      sx={{ 
+                        cursor: 'pointer', 
+                        transition: 'transform 0.2s, box-shadow 0.2s',
+                        '&:hover': {
+                          transform: 'scale(1.05)',
+                          boxShadow: darkMode ? '0 4px 20px rgba(255,255,255,0.1)' : '0 4px 20px rgba(0,0,0,0.2)'
+                        },
+                        height: '100%'
+                      }}
+                    >
+                      <CardMedia
+                        component="img"
+                        image={similarMovie.Poster !== 'N/A' ? similarMovie.Poster : '/placeholder.jpg'}
+                        alt={similarMovie.Title}
+                        sx={{ 
+                          aspectRatio: '2/3', 
+                          objectFit: 'cover',
+                          height: '200px'
+                        }}
+                      />
+                      <CardContent sx={{ p: 1.5, textAlign: 'center' }}>
+                        <Typography variant="subtitle2" noWrap sx={{ fontWeight: 'bold', fontSize: '0.9rem' }}>
+                          {similarMovie.Title}
+                        </Typography>
+                        <Typography variant="caption" color="text.secondary">
+                          ({similarMovie.Year})
+                        </Typography>
+                      </CardContent>
+                    </Card>
+                  </Grid>
+                ))}
+              </Grid>
+            </Paper>
+          </Fade>
+        )}
 
         {/* Yorumlar Bölümü - Reddit Tarzı */}
         <Fade in timeout={1200}>
