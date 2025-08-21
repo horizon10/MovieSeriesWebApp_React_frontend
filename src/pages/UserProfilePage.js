@@ -64,6 +64,12 @@ const UserProfilePage = () => {
     movies: [],
     series: []
   });
+  // Watched state'i eklendi
+  const [watched, setWatched] = useState({
+    all: [],
+    movies: [],
+    series: []
+  });
   const [comments, setComments] = useState([]);
   const [ratings, setRatings] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -111,6 +117,7 @@ const UserProfilePage = () => {
     try {
       await Promise.all([
         fetchFavorites(),
+        fetchWatched(), // EKLENDI
         fetchUserComments(),
         fetchUserRatings(),
         fetchUserLikedComments()
@@ -281,6 +288,38 @@ const UserProfilePage = () => {
     }
   };
 
+  // Fetch watched - EKLENDI
+  const fetchWatched = async () => {
+    try {
+      const response = await interactionApi.getWatched();
+      const watchedData = response.data;
+
+      const watchedWithDetails = await Promise.all(
+        watchedData.map(async (watch) => {
+          const movieDetail = await fetchMovieDetails(watch.imdbId);
+          // Tür bilgisini standartlaştırılmış şekilde alıyoruz
+          const type = movieDetail?.Type || 'movie';
+          return {
+            ...watch,
+            movieDetail,
+            type
+          };
+        })
+      );
+
+      // İzlenenleri türlerine göre kesin olarak ayırıyoruz
+      const movies = watchedWithDetails.filter(item => item.type === 'movie');
+      const series = watchedWithDetails.filter(item => item.type === 'series');
+
+      setWatched({
+        all: watchedWithDetails,
+        movies,
+        series
+      });
+    } catch (error) {
+      console.error('Error fetching watched:', error);
+    }
+  };
 
   // Fetch comments
   const fetchUserComments = async () => {
@@ -386,6 +425,23 @@ const UserProfilePage = () => {
     } catch (error) {
       console.error('Error removing favorite:', error);
       showAlert('error', 'Failed to remove favorite');
+    }
+  };
+
+  // İzlenenlerden çıkarma fonksiyonu - EKLENDI
+  const removeWatched = async (imdbId) => {
+    try {
+      await interactionApi.removeWatched(imdbId);
+      setWatched(prev => ({
+        all: prev.all.filter(watch => watch.imdbId !== imdbId),
+        movies: prev.movies.filter(watch => watch.imdbId !== imdbId),
+        series: prev.series.filter(watch => watch.imdbId !== imdbId)
+      }));
+
+      showAlert('success', 'Removed from watched successfully');
+    } catch (error) {
+      console.error('Error removing watched:', error);
+      showAlert('error', 'Failed to remove watched');
     }
   };
 
@@ -632,13 +688,17 @@ return (
         >
           {/* Top Actions */}
           <Box sx={{ display: 'flex', justifyContent: 'flex-end' }}>
-            {type === 'favorite' && (
-              <Tooltip title="Remove from favorites">
+            {(type === 'favorite' || type === 'watched') && (
+              <Tooltip title={type === 'favorite' ? 'Remove from favorites' : 'Remove from watched'}>
                 <IconButton
                   size="small"
                   onClick={(e) => {
                     e.stopPropagation();
-                    onRemove(item.imdbId);
+                    if (type === 'favorite') {
+                      onRemove(item.imdbId);
+                    } else if (type === 'watched') {
+                      removeWatched(item.imdbId);
+                    }
                   }}
                   sx={{
                     color: 'white',
@@ -730,6 +790,7 @@ return (
             <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <Typography variant="caption" sx={{ opacity: 0.7 }}>
                 {type === 'favorite' && `Added: ${new Date(item.createdAt).toLocaleDateString()}`}
+                {type === 'watched' && `Watched: ${new Date(item.createdAt).toLocaleDateString()}`}
                 {type === 'rating' && `Rated: ${new Date(item.createdAt).toLocaleDateString()}`}
               </Typography>
               
@@ -890,7 +951,7 @@ return (
         <CircularProgress />
       </Box>
     );
-  }
+  };
 
   return (
     <Container maxWidth="lg" sx={{ py: 3 }}>
@@ -1315,7 +1376,7 @@ return (
         </CardContent>
       </Card>
 
-      {/* Statistics */}
+      {/* Statistics - İzlenme istatistiği eklendi */}
       <Grid container spacing={3} sx={{ mb: 4 }}>
         <Grid item xs={12} sm={3}>
           <StatCard
@@ -1323,6 +1384,14 @@ return (
             title="Favorites"
             count={favorites.all.length}
             color="#e91e63"
+          />
+        </Grid>
+        <Grid item xs={12} sm={3}>
+          <StatCard
+            icon={<Visibility sx={{ fontSize: 40 }} />}
+            title="Watched"
+            count={watched.all.length}
+            color="#4caf50"
           />
         </Grid>
         <Grid item xs={12} sm={3}>
@@ -1341,37 +1410,45 @@ return (
             color="#2196f3"
           />
         </Grid>
-        <Grid item xs={12} sm={3}>
-          <StatCard
-            icon={<ThumbUpIcon sx={{ fontSize: 40 }} />}
-            title="Likes"
-            count={likedComments.length}
-            color="#4caf50"
-          />
-        </Grid>
       </Grid>
 
-      {/* Tabs */}
+      {/* Tabs - İzlenme tabları eklendi */}
       <Paper sx={{ mb: 3 }}>
         <Tabs
           value={activeTab}
           onChange={handleTabChange}
-          variant="fullWidth"
+          variant="scrollable"
+          scrollButtons="auto"
           sx={{ borderBottom: 1, borderColor: 'divider' }}
         >
           <Tab
             icon={<Favorite />}
-            label={`All (${favorites.all.length})`}
+            label={`Favorites (${favorites.all.length})`}
             iconPosition="start"
           />
           <Tab
             icon={<Movie />}
-            label={`Movies (${favorites.movies.length})`}
+            label={`Fav Movies (${favorites.movies.length})`}
             iconPosition="start"
           />
           <Tab
             icon={<LiveTv />}
-            label={`Series (${favorites.series.length})`}
+            label={`Fav Series (${favorites.series.length})`}
+            iconPosition="start"
+          />
+          <Tab
+            icon={<Visibility />}
+            label={`Watched (${watched.all.length})`}
+            iconPosition="start"
+          />
+          <Tab
+            icon={<Movie />}
+            label={`Watched Movies (${watched.movies.length})`}
+            iconPosition="start"
+          />
+          <Tab
+            icon={<LiveTv />}
+            label={`Watched Series (${watched.series.length})`}
             iconPosition="start"
           />
           <Tab
@@ -1391,9 +1468,12 @@ return (
           />
         </Tabs>
       </Paper>
+
+      {/* Tab Contents */}
+      
+      {/* All Favorites Tab */}
       {activeTab === 0 && (
         <Box>
-          {/* Tab Contents */}
           {favorites.all.length === 0 ? (
             <Paper sx={{ p: 4, textAlign: 'center' }}>
               <Favorite sx={{ fontSize: 60, color: 'grey.400', mb: 2 }} />
@@ -1420,7 +1500,7 @@ return (
         </Box>
       )}
 
-      {/* Movies Tab */}
+      {/* Favorite Movies Tab */}
       {activeTab === 1 && (
         <Box>
           {favorites.movies.length === 0 ? (
@@ -1448,7 +1528,8 @@ return (
           )}
         </Box>
       )}
-      {/* Series Tab */}
+
+      {/* Favorite Series Tab */}
       {activeTab === 2 && (
         <Box>
           {favorites.series.length === 0 ? (
@@ -1476,8 +1557,96 @@ return (
           )}
         </Box>
       )}
-      {/* Ratings Tab */}
+
+      {/* All Watched Tab - EKLENDI */}
       {activeTab === 3 && (
+        <Box>
+          {watched.all.length === 0 ? (
+            <Paper sx={{ p: 4, textAlign: 'center' }}>
+              <Visibility sx={{ fontSize: 60, color: 'grey.400', mb: 2 }} />
+              <Typography variant="h6" gutterBottom>
+                No watched content yet
+              </Typography>
+              <Typography variant="body2" color="text.secondary">
+                Start marking movies and series as watched to see them here!
+              </Typography>
+            </Paper>
+          ) : (
+            <Grid container spacing={3}>
+              {watched.all.map((watchedItem) => (
+                <Grid item xs={12} sm={6} md={4} key={watchedItem.imdbId}>
+                  <MovieCard
+                    item={watchedItem}
+                    type="watched"
+                    onRemove={removeWatched}
+                  />
+                </Grid>
+              ))}
+            </Grid>
+          )}
+        </Box>
+      )}
+
+      {/* Watched Movies Tab - EKLENDI */}
+      {activeTab === 4 && (
+        <Box>
+          {watched.movies.length === 0 ? (
+            <Paper sx={{ p: 4, textAlign: 'center' }}>
+              <Movie sx={{ fontSize: 60, color: 'grey.400', mb: 2 }} />
+              <Typography variant="h6" gutterBottom>
+                No watched movies yet
+              </Typography>
+              <Typography variant="body2" color="text.secondary">
+                Start marking movies as watched to see them here!
+              </Typography>
+            </Paper>
+          ) : (
+            <Grid container spacing={3}>
+              {watched.movies.map((watchedItem) => (
+                <Grid item xs={12} sm={6} md={4} key={watchedItem.imdbId}>
+                  <MovieCard
+                    item={watchedItem}
+                    type="watched"
+                    onRemove={removeWatched}
+                  />
+                </Grid>
+              ))}
+            </Grid>
+          )}
+        </Box>
+      )}
+
+      {/* Watched Series Tab - EKLENDI */}
+      {activeTab === 5 && (
+        <Box>
+          {watched.series.length === 0 ? (
+            <Paper sx={{ p: 4, textAlign: 'center' }}>
+              <LiveTv sx={{ fontSize: 60, color: 'grey.400', mb: 2 }} />
+              <Typography variant="h6" gutterBottom>
+                No watched series yet
+              </Typography>
+              <Typography variant="body2" color="text.secondary">
+                Start marking series as watched to see them here!
+              </Typography>
+            </Paper>
+          ) : (
+            <Grid container spacing={3}>
+              {watched.series.map((watchedItem) => (
+                <Grid item xs={12} sm={6} md={4} key={watchedItem.imdbId}>
+                  <MovieCard
+                    item={watchedItem}
+                    type="watched"
+                    onRemove={removeWatched}
+                  />
+                </Grid>
+              ))}
+            </Grid>
+          )}
+        </Box>
+      )}
+
+      {/* Ratings Tab */}
+      {activeTab === 6 && (
         <Box>
           {ratings.length === 0 ? (
             <Paper sx={{ p: 4, textAlign: 'center' }}>
@@ -1500,8 +1669,9 @@ return (
           )}
         </Box>
       )}
+
       {/* Comments Tab */}
-      {activeTab === 4 && (
+      {activeTab === 7 && (
         <Box>
           {comments.length === 0 ? (
             <Paper sx={{ p: 4, textAlign: 'center' }}>
@@ -1526,7 +1696,7 @@ return (
       )}
 
       {/* Liked Comments Tab */}
-      {activeTab === 5 && (
+      {activeTab === 8 && (
         <Box>
           {likedComments.length === 0 ? (
             <Paper sx={{ p: 4, textAlign: 'center' }}>

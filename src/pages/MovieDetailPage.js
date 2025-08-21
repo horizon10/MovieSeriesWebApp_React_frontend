@@ -28,6 +28,8 @@ import ThumbUpOutlinedIcon from '@mui/icons-material/ThumbUpOutlined';
 import ReplyIcon from '@mui/icons-material/Reply';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import ExpandLessIcon from '@mui/icons-material/ExpandLess';
+import VisibilityIcon from '@mui/icons-material/Visibility';
+import VisibilityOffIcon from '@mui/icons-material/VisibilityOff';
 import { useTheme } from '../context/ThemeContext';
 
 const MovieDetailPage = () => {
@@ -39,6 +41,7 @@ const MovieDetailPage = () => {
   const [userRating, setUserRating] = useState(0);
   const [averageRating, setAverageRating] = useState(0);
   const [isFavorite, setIsFavorite] = useState(false);
+  const [isWatched, setIsWatched] = useState(false); // EKLENDI
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [successMessage, setSuccessMessage] = useState('');
@@ -140,7 +143,7 @@ if (movieRes.data) {
           setAverageRating(0);
         }
 
-        // Favori durumunu kontrol et (sadece kullanıcı giriş yaptıysa)
+        // Favori ve izlenme durumunu kontrol et (sadece kullanıcı giriş yaptıysa)
         if (user) {
           try {
             const favRes = await interactionApi.getFavorites();
@@ -148,6 +151,15 @@ if (movieRes.data) {
           } catch (err) {
           console.warn('Favorites fetch error:', err);
           setIsFavorite(false);
+          }
+
+          // İzlenme durumunu kontrol et - EKLENDI
+          try {
+            const watchedRes = await interactionApi.getWatched();
+            setIsWatched(watchedRes.data.some(watched => watched.imdbId === imdbId));
+          } catch (err) {
+            console.warn('Watched fetch error:', err);
+            setIsWatched(false);
           }
         }
 
@@ -597,6 +609,29 @@ if (movieRes.data) {
     }
   };
 
+  // İzlenme durumu toggle fonksiyonu - EKLENDI
+  const toggleWatched = async () => {
+    if (!user) {
+      navigate('/login');
+      return;
+    }
+    
+    try {
+      setError(null);
+      if (isWatched) {
+        await interactionApi.removeWatched(imdbId);
+        setSuccessMessage('Film izlenenlerden çıkarıldı');
+      } else {
+        await interactionApi.addWatched(imdbId);
+        setSuccessMessage('Film izlenenlere eklendi');
+      }
+      setIsWatched(!isWatched);
+    } catch (err) {
+      console.error('Watched toggle error:', err);
+      setError('İzlenme işlemi sırasında hata oluştu: ' + (err.response?.data || err.message));
+    }
+  };
+
   const handleCloseSnackbar = () => {
     setSuccessMessage('');
     setError(null);
@@ -729,7 +764,7 @@ if (movieRes.data) {
                 }}
                 elevation={10}
               >
-                {/* Başlık ve Favori */}
+                {/* Başlık ve Aksiyon Butonları - DEĞİŞTİRİLDİ */}
                 <Box display="flex" justifyContent="space-between" alignItems="flex-start" mb={3}>
                   <Box>
                     <Typography 
@@ -752,28 +787,55 @@ if (movieRes.data) {
                       ({movie.Year})
                     </Typography>
                   </Box>
-                  <IconButton 
-                    onClick={toggleFavorite} 
-                    size="large"
-                    sx={{
-                      background: isFavorite 
-                        ? (darkMode ? 'rgba(244, 67, 54, 0.2)' : 'rgba(244, 67, 54, 0.1)') 
-                        : (darkMode ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.05)'),
-                      '&:hover': {
+                  <Box sx={{ display: 'flex', gap: 1 }}>
+                    {/* Favori Butonu */}
+                    <IconButton 
+                      onClick={toggleFavorite} 
+                      size="large"
+                      sx={{
                         background: isFavorite 
-                          ? (darkMode ? 'rgba(244, 67, 54, 0.3)' : 'rgba(244, 67, 54, 0.2)')
-                          : (darkMode ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.1)'),
-                        transform: 'scale(1.1)'
-                      },
-                      transition: 'all 0.2s ease'
-                    }}
-                  >
-                    {isFavorite ? (
-                      <FavoriteIcon sx={{ color: '#f44336', fontSize: 32 }} />
-                    ) : (
-                      <FavoriteBorderIcon sx={{ fontSize: 32, color: darkMode ? 'inherit' : 'primary.main' }} />
-                    )}
-                  </IconButton>
+                          ? (darkMode ? 'rgba(244, 67, 54, 0.2)' : 'rgba(244, 67, 54, 0.1)') 
+                          : (darkMode ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.05)'),
+                        '&:hover': {
+                          background: isFavorite 
+                            ? (darkMode ? 'rgba(244, 67, 54, 0.3)' : 'rgba(244, 67, 54, 0.2)')
+                            : (darkMode ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.1)'),
+                          transform: 'scale(1.1)'
+                        },
+                        transition: 'all 0.2s ease'
+                      }}
+                    >
+                      {isFavorite ? (
+                        <FavoriteIcon sx={{ color: '#f44336', fontSize: 32 }} />
+                      ) : (
+                        <FavoriteBorderIcon sx={{ fontSize: 32, color: darkMode ? 'inherit' : 'primary.main' }} />
+                      )}
+                    </IconButton>
+
+                    {/* İzlenme Butonu - EKLENDI */}
+                    <IconButton 
+                      onClick={toggleWatched} 
+                      size="large"
+                      sx={{
+                        background: isWatched 
+                          ? (darkMode ? 'rgba(76, 175, 80, 0.2)' : 'rgba(76, 175, 80, 0.1)') 
+                          : (darkMode ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.05)'),
+                        '&:hover': {
+                          background: isWatched 
+                            ? (darkMode ? 'rgba(76, 175, 80, 0.3)' : 'rgba(76, 175, 80, 0.2)')
+                            : (darkMode ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.1)'),
+                          transform: 'scale(1.1)'
+                        },
+                        transition: 'all 0.2s ease'
+                      }}
+                    >
+                      {isWatched ? (
+                        <VisibilityIcon sx={{ color: '#4caf50', fontSize: 32 }} />
+                      ) : (
+                        <VisibilityOffIcon sx={{ fontSize: 32, color: darkMode ? 'inherit' : 'primary.main' }} />
+                      )}
+                    </IconButton>
+                  </Box>
                 </Box>
 
                 {/* Film Etiketleri */}
@@ -922,7 +984,7 @@ if (movieRes.data) {
           </Grid>
         </Fade>
 
-        {/* Önerilen Dizi/Film Bölümü - YORUMLARIN ÜSTÜNDE */}
+        {/* Önerilen Dizi/Film Bölümü - YORUMLARIN ÜSTÜNDEde */}
         {similarMovies.length > 0 && (
           <Fade in timeout={1000}>
             <Paper 

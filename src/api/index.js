@@ -97,6 +97,12 @@ export const interactionApi = {
   getFavorites: () => api.get('/api/home/favorite'),
   getMostFavorited: () => api.get('/api/home/favorite/most-favorited'),
 
+  // izleme işlemleri
+  addWatched: (imdbId) => api.post(`/api/home/watched/${imdbId}`, ""),
+  removeWatched: (imdbId) => api.delete(`/api/home/watched/${imdbId}`),
+  getWatched: () => api.get('/api/home/watched'),
+  getMostWatched: () => api.get('/api/home/watched/most-watched'),
+
   // Yorum işlemleri
   addComment: (imdbId, content) => api.post(`/api/home/comment/${imdbId}`, content, {
     headers: {
